@@ -15,6 +15,12 @@ try{
  await page.getByRole('button',{name:'继续',exact:true}).click();await page.locator('.onboarding[data-step="3"]').waitFor();
  const guide=await page.locator('dialog[open]').innerText();assert.match(guide,/底栏质感/);assert.match(guide,/在“外观”/);assert.match(guide,/背景毛玻璃与底栏质感/);assert.doesNotMatch(guide,/关闭、部分或完全/);
  await page.getByRole('button',{name:'先逛一逛',exact:true}).click();
+ // 像素对比固定使用实际“高画质”偏好，避免 60Hz CI 的自动降级在截图前恢复。
+ await page.evaluate(async()=>{
+  const {loadData,saveData}=await import('/src/lib/storage.ts');
+  const data=await loadData();data.settings.performance='high';await saveData(data);
+ });
+ await page.reload();
  await page.locator('.dock[data-droplet-ready=true]').waitFor();
  await page.evaluate(()=>{
   document.documentElement.dataset.performance='full';
@@ -29,7 +35,9 @@ try{
   const pixels=await Promise.all(images.map(async src=>{const image=new Image();image.src=src;await image.decode();const c=document.createElement('canvas');c.width=image.width;c.height=image.height;const ctx=c.getContext('2d');ctx.drawImage(image,0,0);return ctx.getImageData(0,0,c.width,c.height).data;}));
   let count=0;for(let i=0;i<pixels[0].length;i+=4)if(Math.abs(pixels[0][i]-pixels[1][i])+Math.abs(pixels[0][i+1]-pixels[1][i+1])+Math.abs(pixels[0][i+2]-pixels[1][i+2])>30)count++;return count;
  },[refracted,flat].map(buffer=>'data:image/png;base64,'+buffer.toString('base64')));
- assert.ok(changed>80,`局部位移滤镜未真正改变背景像素: ${changed}`);
+ const renderer=await page.evaluate(()=>({performance:document.documentElement.dataset.performance,refraction:document.documentElement.dataset.refraction,filter:getComputedStyle(document.querySelector('.dock-droplet-window')).backdropFilter}));
+ assert.equal(renderer.performance,'full','像素对比必须在真实高画质模式运行');
+ assert.ok(changed>80,`局部位移滤镜未真正改变背景像素: ${changed}；${JSON.stringify(renderer)}`);
  await mkdir('build/evidence',{recursive:true});await writeFile('build/evidence/glass-refraction.png',refracted);await writeFile('build/evidence/glass-flat.png',flat);
  await page.evaluate(()=>{document.getElementById('glass-test-pattern').remove();document.documentElement.dataset.refraction='true';document.querySelector('#glass-droplet feDisplacementMap').setAttribute('scale','7');});
  await page.getByRole('button',{name:'设置',exact:true}).click();await page.screenshot({path:'build/evidence/classic-settings.png'});
