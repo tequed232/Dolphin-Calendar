@@ -45,6 +45,12 @@ function selfTest(){
     git(['rm','--quiet','payload.apk']);commit('synthetic deletion');
     result=run();if(result.status===0||!result.stderr.includes(bad))throw new Error('未能拒绝已在后续删除的历史 APK');
     console.log('PASS APK 已在端点删除，新增历史仍被拒绝');
+    // Deleted remote branches can leave stale tracking refs; they are not a trusted new-branch baseline.
+    git(['update-ref','refs/remotes/origin/stale',bad]);
+    const tip=git(['rev-parse','HEAD']);
+    result=spawnSync(process.execPath,['scripts/check-source-push.mjs','origin'],{encoding:'utf8',input:`refs/heads/new ${tip} refs/heads/new ${'0'.repeat(40)}\n`});
+    if(result.status===0||!result.stderr.includes(bad))throw new Error('过期远端跟踪引用绕过了新分支历史检查');
+    console.log('PASS 新分支忽略过期远端跟踪引用，完整历史中的 APK 仍被拒绝');
   }finally{
     process.chdir(original);
     const target=path.resolve(temp),prefix=path.resolve(os.tmpdir())+path.sep;
@@ -68,7 +74,7 @@ try{
       const fields=line.trim().split(/\s+/),tip=fields[1],before=fields[3];
       if(fields.length!==4||!sha.test(tip)||!sha.test(before))throw new Error('无效的 Git 推送条目');
       if(zero.test(tip))continue;
-      const baseline=!zero.test(before)?[before]:git(['for-each-ref','--format=%(objectname)',`refs/remotes/${remote}/`]).split('\n').filter(Boolean);
+      const baseline=!zero.test(before)?[before]:[];
       for(const ref of range(tip,baseline))commits.add(ref);
     }
   }

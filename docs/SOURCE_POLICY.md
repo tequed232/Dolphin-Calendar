@@ -20,7 +20,7 @@ node scripts/check-source-files.mjs --ref HEAD
 ```
 
 - `pre-commit`：只检查 Git 暂存索引中的新增、修改及重命名条目，不用工作树内容替代实际将提交的文件。
-- `pre-push`：检查推送端点的完整源码及新增提交历史。将 APK 加进早期提交、之后再删除，也不能通过。目标远端提交不在本地时先执行 `git fetch`。
+- `pre-push`：检查推送端点的完整源码及新增提交历史。将 APK 加进早期提交、之后再删除，也不能通过。新建远端分支时检查完整可达历史，不用可能过期的本地远端跟踪引用作为豁免基线。已有目标远端提交不在本地时先执行 `git fetch`。
 - `npm run check`：同时运行准入检查、自检、业务源码守卫、资产及解析测试。
 - 独立快照：`node scripts/check-source-files.mjs --directory 路径`，检查所有文件与必需路径，不忽略隐藏文件或未跟踪文件。
 - CI：`Source admission` 在 push、pull request 和手动触发时严格检查完整提交树和新增提交历史，不安装 npm 依赖也可执行。
