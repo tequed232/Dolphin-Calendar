@@ -5,8 +5,8 @@
 | 权限 | 用途 | 触发方式 |
 | --- | --- | --- |
 | `READ_CALENDAR` | 读取选定日历来源中的节假日、核对应用课程日历 | 用户使用日历功能时申请 |
-| `WRITE_CALENDAR` | 创建或复原 Dolphin Calendar 的课程日历 | 用户导入或复原时申请 |
-| `POST_NOTIFICATIONS` | 课前提醒、上课行程与通知栏小伙伴 | 用户主动开启通知功能时申请；Android 13+ |
+| `WRITE_CALENDAR` | 创建、清理或复原 Dolphin Calendar 的课程日历 | 用户主动导入、清理或复原应用课程日历时申请 |
+| `POST_NOTIFICATIONS` | 课前提醒、上课行程与通知栏小伙伴 | 用户主动开启通知功能、发送测试通知或开始导航行程时申请；Android 13+ |
 | `POST_PROMOTED_NOTIFICATIONS` | 为符合条件的进行中行程请求 Android 实时更新 | Android 16+ 的声明权限；不单独弹运行时授权框 |
 
 第一次引导不批量索取权限。拒绝日历或通知授权不会阻断本地课表、课程编辑和外观设置；相应原生功能会说明原因。
