@@ -1,0 +1,32 @@
+.holiday-date{position:relative}
+.holiday-mark{display:inline-grid;place-items:center;flex-shrink:0;width:21px;height:21px;border-radius:7px;font-size:11px;font-weight:650;line-height:1;color:var(--holiday-ink);background:var(--holiday-soft)}
+.holiday-mark.rest,.holiday-rest{--holiday-ink:#825b45;--holiday-soft:#f7e6dc;--holiday-line:#d4ae98}
+.holiday-mark.makeup,.holiday-makeup{--holiday-ink:#405f7d;--holiday-soft:#e3edf7;--holiday-line:#a4bbd0}
+.holiday-mark.festival,.holiday-festival{--holiday-ink:#6f5a7c;--holiday-soft:#f0e6f5;--holiday-line:#c5acd2}
+.date-item.holiday-date:not(.selected),.calendar-day.holiday-date:not(.picked){background:var(--holiday-soft)}
+.date-item.holiday-date>.holiday-mark{position:absolute;top:5px;right:5px;width:18px;height:18px;font-size:10px;border-radius:6px}
+.date-item.holiday-date>span{padding-inline:12px}
+.calendar-day.holiday-date>.holiday-mark{position:absolute;top:3px;right:3px;width:15px;height:15px;font-size:9px;border-radius:5px}
+.calendar-day.holiday-date{padding-top:18px;padding-bottom:5px;gap:2px}
+.date-item.selected>.holiday-mark,.calendar-day.picked>.holiday-mark{background:#ffffff24;color:var(--on-accent);border:1px solid #ffffff50}
+.calendar-day.holiday-date.adjacent{opacity:.75}
+.selected-holiday{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:16px;padding:11px 13px;margin-top:12px;background:var(--surface)}
+.selected-holiday p{font-size:12px;line-height:1.6;margin:0;color:var(--ink);overflow-wrap:anywhere}
+.selected-holiday small{display:block;font-size:10px;line-height:1.5;color:var(--muted);margin-top:3px}
+.holiday-legend{display:flex;flex-wrap:wrap;gap:12px;padding:15px 0 5px;font-size:12px;color:var(--muted)}
+.holiday-legend>span{display:flex;align-items:center;gap:6px}
+.holiday-source-summary,.holiday-cache-summary{font-size:12px;line-height:1.7;color:var(--muted);overflow-wrap:anywhere}
+.holiday-cache-summary{margin-bottom:0}
+.holiday-source-list{margin-top:12px}
+.holiday-source-option{display:flex;align-items:center;gap:12px;padding:14px 3px;border-bottom:1px solid var(--line);cursor:pointer}
+.holiday-source-option input{width:20px;height:20px;flex-shrink:0;accent-color:var(--accent)}
+.holiday-source-option>span{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere}
+.holiday-source-option strong{font-size:14px;font-weight:550}
+.holiday-source-option small{font-size:11px;color:var(--muted)}
+.holiday-source-list>button{margin-top:14px}
+.holiday-status{padding:13px 15px;font-size:13px;line-height:1.7;border-radius:16px;background:var(--accent-soft);color:var(--accent);overflow-wrap:anywhere}
+.holiday-status.error{background:var(--soft);color:var(--ink);border:1px solid var(--line)}
+:root[data-mode=dark] .holiday-mark.rest,:root[data-mode=dark] .holiday-rest{--holiday-ink:#f0c9b2;--holiday-soft:#46352d;--holiday-line:#916f5b}
+:root[data-mode=dark] .holiday-mark.makeup,:root[data-mode=dark] .holiday-makeup{--holiday-ink:#c2d7ed;--holiday-soft:#2d3a48;--holiday-line:#6a859f}
+:root[data-mode=dark] .holiday-mark.festival,:root[data-mode=dark] .holiday-festival{--holiday-ink:#ddc6e9;--holiday-soft:#413547;--holiday-line:#8d739c}
+@media(max-width:350px){.calendar-day.holiday-date>.holiday-mark{width:13px;height:13px;font-size:8px;top:2px;right:1px}.date-item.holiday-date>.holiday-mark{right:3px}.holiday-legend{gap:9px}}

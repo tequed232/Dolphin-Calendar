@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "allowedPaths": [
+    ".gitattributes", ".gitignore", "README.md", "RELEASE_NOTES.md", "THIRD_PARTY_NOTICES.md",
+    "LICENSE", "LICENSE.md", "LICENSE.txt", "release-identity.json", "source-policy.json",
+    "package.json", "package-lock.json", "build.gradle.kts", "settings.gradle.kts", "gradle.properties",
+    "gradlew", "gradlew.bat", "gradle/wrapper/gradle-wrapper.properties",
+    "gradle/wrapper/gradle-wrapper.jar", ".githooks/pre-commit", ".githooks/pre-push",
+    "web/index.html", "web/vite.config.ts", "web/tsconfig.json", "web/src/assets/icons/LICENSE"
+  ],
+  "allowedPatterns": [
+    ".github/**/*.md", ".github/workflows/*.yml", ".github/workflows/*.yaml",
+    "app/*.gradle.kts", "app/*.pro", "app/src/**/*.kt", "app/src/**/*.java", "app/src/**/*.xml",
+    "app/src/**/res/**/*.png", "app/src/**/res/**/*.jpg", "app/src/**/res/**/*.jpeg", "app/src/**/res/**/*.webp", "app/src/**/res/**/*.svg",
+    "scripts/**/*.mjs", "scripts/**/*.cjs", "scripts/**/*.js", "scripts/**/*.ts", "scripts/**/*.tsx", "scripts/**/*.ps1",
+    "web/src/**/*.ts", "web/src/**/*.tsx", "web/src/**/*.css", "web/src/**/*.json", "web/src/**/*.svg",
+    "web/src/**/*.png", "web/src/**/*.jpg", "web/src/**/*.jpeg", "web/src/**/*.webp",
+    "web/src/vendor/**/LICENSE", "web/src/vendor/**/LICENSE.md", "web/src/vendor/**/LICENSE.txt",
+    "docs/**/*.md", "docs/images/**/*.png", "docs/images/**/*.jpg", "docs/images/**/*.jpeg", "docs/images/**/*.webp", "docs/images/**/*.svg",
+    "legal/**/*.txt", "legal/**/*.md"
+  ],
+  "allowedBinaryPaths": ["gradle/wrapper/gradle-wrapper.jar"],
+  "deniedDirectoryNames": [
+    "node_modules", "build", "dist", "out", "target", ".gradle", ".kotlin", ".idea", ".run", ".signing",
+    "releases", "release", ".cache", ".npm", ".yarn", ".pnpm-store", "__pycache__", "device-backups", ".git"
+  ],
+  "deniedFileNames": [
+    "local.properties", "signing.local.properties", "credentials.json", "secrets.json", "id_rsa", "id_ed25519", ".ds_store", "thumbs.db", "Dolphin Calendar全量提示词.txt"
+  ],
+  "deniedPatterns": [
+    "app/src/**/assets/**", "**/.env", "**/.env.*", "**/*-wal", "**/*-shm", "**/*-journal",
+    "**/*.apk", "**/*.apks", "**/*.aab", "**/*.aar", "**/*.dex", "**/*.class", "**/*.jar",
+    "**/*.zip", "**/*.7z", "**/*.rar", "**/*.tar", "**/*.gz", "**/*.tgz", "**/*.bz2", "**/*.xz",
+    "**/*.exe", "**/*.dll", "**/*.so", "**/*.dylib", "**/*.wasm", "**/*.jks", "**/*.keystore", "**/*.key", "**/*.pem", "**/*.p12", "**/*.pfx",
+    "**/*.db", "**/*.db3", "**/*.sqlite", "**/*.sqlite3", "**/*.v8", "**/*.log", "**/*.bak", "**/*.iml",
+    "Dolphin Calendar全量提示词.txt"
+  ],
+  "legacyTrackedPatterns": [".idea/**", ".run/**", "Dolphin Calendar全量提示词.txt"],
+  "requiredPaths": [
+    "source-policy.json", "scripts/check-source-files.mjs", "scripts/check-source-push.mjs", ".githooks/pre-commit", ".githooks/pre-push",
+    ".github/workflows/source-admission.yml", "README.md", "package.json", "package-lock.json",
+    "web/index.html", "web/src/main.tsx", "web/src/meta.ts", "web/tsconfig.json", "web/vite.config.ts",
+    "build.gradle.kts", "settings.gradle.kts", "app/build.gradle.kts", "app/src/main/AndroidManifest.xml",
+    "gradlew", "gradlew.bat", "gradle/wrapper/gradle-wrapper.properties", "gradle/wrapper/gradle-wrapper.jar"
+  ]
+}

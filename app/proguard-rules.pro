@@ -1,0 +1,2 @@
+-keepclassmembers class com.dolphin.calendar.MainActivity$Bridge { @android.webkit.JavascriptInterface <methods>; }
+-keepclassmembers class * { @android.webkit.JavascriptInterface <methods>; }

@@ -1,0 +1,32 @@
+{
+  "name": "dolphin-calendar",
+  "version": "1.4.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config web/vite.config.ts --host 127.0.0.1 --port 5173 --strictPort",
+    "build": "tsc --noEmit -p web/tsconfig.json && vite build --config web/vite.config.ts && node scripts/build-offline.mjs",
+    "preview": "vite preview --config web/vite.config.ts --host 127.0.0.1 --port 4173 --strictPort",
+    "check": "node scripts/verify.mjs",
+    "check:source-files": "node scripts/check-source-files.mjs",
+    "hooks:install": "git config --local core.hooksPath .githooks",
+    "test": "node --import tsx --test scripts/check-import.test.ts",
+    "check:ui": "node scripts/check-ui.mjs",
+    "android": "powershell -ExecutionPolicy Bypass -File scripts/android.ps1",
+    "deliver": "pwsh -NoProfile -File scripts/deliver.ps1"
+  },
+  "dependencies": {
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@material-symbols/svg-400": "0.47.5",
+    "@types/react": "19.1.13",
+    "@types/react-dom": "19.1.9",
+    "@vitejs/plugin-react": "5.0.3",
+    "playwright": "1.55.1",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2",
+    "vite": "7.3.6"
+  }
+}

@@ -1,0 +1,3 @@
+#!/bin/sh
+set -eu
+node scripts/check-source-push.mjs "$1"

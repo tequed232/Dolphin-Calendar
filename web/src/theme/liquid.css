@@ -1,0 +1,28 @@
+/* Dock refraction stays in its fixed, masked sampling layer. */
+.dock-droplet-rim{box-shadow:inset 0 1px 2px #ffffff70,inset 0 -1px 2px #284d6120}
+
+/* Full mode is a shared material, with one filter on each outer surface. */
+:root[data-glass-mode=full]{--liquid-surface:rgb(255 255 255 / .88);--liquid-soft:rgb(241 245 247 / .9);--liquid-border:rgb(255 255 255 / .8);--liquid-highlight:rgb(255 255 255 / .9);--liquid-shadow:rgb(16 42 48 / .06);--liquid-action:#00646d;--muted:#4b5e62}
+:root[data-glass-mode=full][data-mode=dark]{--liquid-surface:rgb(29 39 42 / .92);--liquid-soft:rgb(41 53 56 / .94);--liquid-border:rgb(216 241 248 / .22);--liquid-highlight:rgb(216 241 248 / .15);--liquid-shadow:rgb(0 0 0 / .12);--liquid-action:var(--accent);--muted:#afc0c5}
+[data-glass-mode=full] :is(md-card,.date-panel,.next-course,.course-card,.empty-card,.selected-day-empty,.other-week-disclosure,.profile-card,.search-box,.search-results,.import-entry,.import-hero,.import-file-option,.book-card,.notes,.journey-guide,.selected-holiday,.sub-header,dialog,.course-sheet){
+  background:var(--liquid-surface);
+  backdrop-filter:blur(7px) saturate(1.08);
+  box-shadow:inset 0 0 0 1px var(--liquid-border),inset 0 1px 1px var(--liquid-highlight),0 3px 12px var(--liquid-shadow);
+}
+[data-glass-mode=full] :is(.next-course,.import-entry,.profile-card){background:color-mix(in srgb,var(--accent-soft) 86%,transparent)}
+[data-glass-mode=full] .course-card.sage{background:color-mix(in srgb,var(--sage) 88%,transparent)}
+[data-glass-mode=full] .course-card.lavender{background:color-mix(in srgb,var(--lavender) 88%,transparent)}
+[data-glass-mode=full] .course-card.peach{background:color-mix(in srgb,var(--peach) 88%,transparent)}
+[data-glass-mode=full] .course-card.blue{background:color-mix(in srgb,var(--blue) 88%,transparent)}
+[data-glass-mode=full] .course-card.rose{background:color-mix(in srgb,var(--rose) 88%,transparent)}
+[data-glass-mode=full] .sub-header{border-radius:22px}
+[data-glass-mode=full] :is(.secondary,.today-fab,.header-action,.sub-header>.icon-button,.choice-trigger){background:var(--liquid-soft);box-shadow:inset 0 0 0 1px var(--liquid-border),inset 0 1px 1px var(--liquid-highlight)}
+[data-glass-mode=full] :is(.secondary,.today-fab,.header-action,.sub-header>.icon-button){color:var(--liquid-action)}
+/* Inputs and primary actions retain opaque colors for predictable legibility. */
+[data-glass-mode=full] :is(.primary,.nav-fab){background:var(--accent);color:var(--on-accent)}
+[data-glass-mode=full] :is(.search-results .result-card,.other-week-list .course-card,md-card .book-card,.course-sheet .book-card){backdrop-filter:none;background:transparent;box-shadow:none}
+[data-glass-mode=full] .other-week-list .course-card{background:color-mix(in srgb,var(--surface) 60%,transparent)}
+[data-glass-mode=full] .choice-menu{background:var(--surface)}
+[data-glass-mode=full][data-performance=reduced] :is(md-card,.date-panel,.next-course,.course-card,.empty-card,.selected-day-empty,.other-week-disclosure,.profile-card,.search-box,.search-results,.import-entry,.import-hero,.import-file-option,.book-card,.notes,.journey-guide,.selected-holiday,.sub-header,dialog,.course-sheet),
+[data-glass-mode=full].gesturing :is(md-card,.date-panel,.next-course,.course-card,.empty-card,.selected-day-empty,.other-week-disclosure,.profile-card,.search-box,.search-results,.import-entry,.import-hero,.import-file-option,.book-card,.notes,.journey-guide,.selected-holiday,.sub-header,dialog,.course-sheet){backdrop-filter:none;background:var(--surface)}
+@media(prefers-reduced-transparency:reduce){[data-glass-mode=full] :is(md-card,.date-panel,.next-course,.course-card,.empty-card,.selected-day-empty,.other-week-disclosure,.profile-card,.search-box,.search-results,.import-entry,.import-hero,.import-file-option,.book-card,.notes,.journey-guide,.selected-holiday,.sub-header,dialog,.course-sheet,.secondary,.today-fab,.header-action,.sub-header>.icon-button,.choice-trigger){backdrop-filter:none;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}}

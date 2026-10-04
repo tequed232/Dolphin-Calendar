@@ -1,0 +1,14 @@
+.welcome-actions{display:flex;flex-direction:column;align-items:center;gap:4px}
+.welcome-actions>.primary{min-width:min(100%,210px)}
+.welcome-actions>.text-button{font-size:13px;white-space:normal}
+.selected-day-empty.empty-day-guidance{display:block}
+.empty-day-overview{display:flex;align-items:center;gap:13px}
+.empty-day-overview>div{min-width:0}
+.empty-day-guidance p{overflow-wrap:anywhere}
+.empty-day-actions{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:13px}
+.empty-day-actions>.secondary{font-size:13px;padding:10px 15px;min-height:44px}
+.empty-day-actions>.text-button{font-size:12px;padding-inline:8px}
+.search-box input{min-width:0}
+.search-result-status{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(max-width:350px){.empty-day-overview{gap:10px}.empty-day-guidance{padding:16px}.empty-day-actions{gap:3px}.empty-day-actions>.secondary{font-size:12px;padding-inline:12px}}
+@media(max-height:700px){.home-welcome-card,.search-page .empty-card{padding:22px 18px}.home-welcome-card h3,.search-page .empty-card h3{margin-top:12px;font-size:18px}.home-welcome-card p,.search-page .empty-card p{font-size:13px;margin-bottom:16px;line-height:1.75}.search-page .page-heading{margin-bottom:19px}.search-page .section-heading{margin-top:20px}}

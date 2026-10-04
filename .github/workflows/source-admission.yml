@@ -1,0 +1,18 @@
+name: Source admission
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  source-admission:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/check-source-files.mjs --strict
+      - run: node scripts/check-source-files.mjs --self-test
+      - run: node scripts/check-source-push.mjs --self-test
+      - run: node scripts/check-source-push.mjs --ci

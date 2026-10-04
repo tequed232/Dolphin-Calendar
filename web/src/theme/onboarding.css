@@ -1,0 +1,67 @@
+dialog:has(.onboarding){overflow:hidden;max-width:420px}
+dialog:has(.onboarding) .dialog-content{display:flex;flex-direction:column;max-height:calc((var(--native-height,100dvh) - var(--safe-top) - max(var(--safe-bottom),var(--keyboard-height)) - 28px)/var(--ui-scale));padding:20px;min-height:0}
+dialog:has(.onboarding) .dialog-heading{flex-shrink:0;margin-bottom:12px;gap:6px}
+dialog:has(.onboarding) .dialog-heading h2{font-size:20px;line-height:1.35;letter-spacing:-.4px}
+.onboarding{display:flex;flex-direction:column;min-height:0;gap:16px}
+.onboarding-progress{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
+.onboarding-brand{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px;min-width:0}
+.onboarding-brand .brand-art{flex-shrink:0;border-radius:9px}
+.onboarding-page{font-size:12px;font-variant-numeric:tabular-nums;color:var(--accent);white-space:nowrap;background:var(--accent-soft);border-radius:16px;padding:5px 9px}
+.onboarding-track{list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:0;margin:0;flex-shrink:0}
+.onboarding-track>li{display:flex;flex-direction:column;gap:5px;font-size:10px;line-height:1.4;color:var(--muted)}
+.onboarding-track i{height:3px;border-radius:3px;background:var(--line);width:100%}
+.onboarding-track [data-complete=true] i{background:var(--accent);opacity:.45}
+.onboarding-track [aria-current=step]{color:var(--accent)}
+.onboarding-track [aria-current=step] i{background:var(--accent)}
+.onboarding-panel{min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line) transparent;padding:1px 1px 3px;flex-shrink:1}
+.onboarding-copy h3{font-size:22px;line-height:1.45;font-weight:710;letter-spacing:-.5px;margin:0 0 7px}
+.onboarding-copy>p{font-size:13px;color:var(--muted);line-height:1.7;margin:0 0 16px}
+.onboarding-cards{display:flex;flex-direction:column;gap:10px}
+.onboarding-card{display:flex;align-items:flex-start;gap:11px;padding:14px 12px;border-radius:19px;background:var(--soft)}
+.onboarding-card-icon{width:35px;height:35px;border-radius:12px;display:grid;place-items:center;flex-shrink:0;color:var(--accent);background:var(--accent-soft)}
+.onboarding-card>div{min-width:0}
+.onboarding-card h4{font-size:14px;line-height:1.5;margin:0 0 4px;font-weight:650}
+.onboarding-card p{font-size:12px;line-height:1.7;color:var(--muted);margin:0;overflow-wrap:anywhere}
+.onboarding-footer{flex-shrink:0;padding-top:13px;border-top:1px solid var(--line)}
+.onboarding-scroll-note{font-size:10px;line-height:1.4;color:var(--muted);text-align:center;margin:0 0 7px;min-height:14px}
+.onboarding-scroll-note.is-hidden{visibility:hidden}
+.onboarding-next,.onboarding-start>button{width:100%;min-height:46px;font-size:14px;padding:11px 12px}
+.onboarding-start{display:flex;flex-direction:column;gap:8px}
+.onboarding-shortcuts{display:flex;align-items:center;justify-content:space-between;gap:7px;margin-top:3px}
+.onboarding-shortcuts .text-button{font-size:11px;padding:7px 5px;min-height:40px}
+.onboarding-error{font-size:12px;line-height:1.6;color:var(--danger);background:var(--surface);border:1px solid var(--line);padding:8px 10px;border-radius:12px}
+.onboarding-secondary{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
+.onboarding-secondary .text-button{font-size:12px;padding:8px 5px;min-height:44px}
+.onboarding-secondary .text-button:disabled{cursor:default;opacity:.4}
+.onboarding-revisit{font-size:10px;line-height:1.5;color:var(--muted);text-align:center;margin:1px 0 0}
+@media(max-width:350px),(max-height:700px){
+ dialog:has(.onboarding) .dialog-content{padding:16px}
+ dialog:has(.onboarding) .dialog-heading{margin-bottom:9px}
+ dialog:has(.onboarding) .dialog-heading h2{font-size:18px}
+ .onboarding{gap:12px}
+ .onboarding-copy h3{font-size:19px;margin-bottom:5px}
+ .onboarding-copy>p{font-size:12px;line-height:1.65;margin-bottom:12px}
+ .onboarding-card{padding:12px 10px;gap:8px;border-radius:17px}
+ .onboarding-card-icon{height:30px;width:30px;border-radius:10px}
+ .onboarding-card-icon>svg{width:19px;height:19px}
+ .onboarding-card h4{font-size:13px}
+ .onboarding-card p{font-size:11px;line-height:1.65}
+ .onboarding-footer{padding-top:10px}
+}
+@media(max-width:350px) and (max-height:700px){
+ .onboarding-progress .onboarding-brand{display:none}
+ .onboarding-progress{position:absolute;right:66px;top:26px;pointer-events:none}
+ .onboarding-page{font-size:10px;padding:3px 5px;background:transparent}
+ dialog:has(.onboarding) .dialog-heading h2{font-size:16px;padding-right:32px}
+ .onboarding{gap:9px}
+ .onboarding-footer{padding-top:6px}
+ .onboarding-start{gap:6px}
+ .onboarding-next,.onboarding-start>button{min-height:42px;padding-block:8px;font-size:13px}
+ .onboarding-shortcuts{margin-top:1px}
+ .onboarding-shortcuts .text-button{min-height:40px;padding-block:5px}
+ .onboarding-secondary{margin-top:0}
+ .onboarding-secondary .text-button{padding-block:5px;min-height:40px}
+ .onboarding-scroll-note{margin-bottom:5px;font-size:9px}
+ .onboarding-revisit{font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){dialog:has(.onboarding)[open]{animation:none}}

@@ -1,0 +1,63 @@
+/* Dolphin: content on quiet surfaces, navigation on a separate glass layer. */
+:root {
+  color-scheme: light;
+  --canvas: #f5f6f7;
+  --surface: #ffffff;
+  --input: #f1f3f5;
+  --ink: #182c2d;
+  --muted: #657477;
+  --accent: #007f89;
+  --on-accent: #ffffff;
+  --accent-soft: #e3f2f2;
+  --soft: #edf1f2;
+  --line: #e4e9eb;
+  --line-strong: #b2bec2;
+  --danger: #bd3a39;
+  --sage: #e8f1e6;
+  --lavender: #eeeafb;
+  --peach: #fcf0df;
+  --blue: #e5f0fa;
+  --rose: #f9e9ed;
+  --desktop: #e8edef;
+  --page-gutter: 20px;
+  --safe-top: 0px;
+  --safe-bottom: 0px;
+  --keyboard-height: 0px;
+  --dock-band: calc(var(--safe-bottom) + 104px);
+  --motion-duration: 300ms;
+  --ease: cubic-bezier(.2,.8,.2,1);
+  --glass-tint: #f9ffff70;
+  --glass-border: #ffffffb8;
+  --glass-blur: 2px;
+  --glass-saturation: 1.15;
+  --glass-highlight: .34;
+  --glass-drop-tint: #e8ffff38;
+  --glass-rim: #ffffffcf;
+  --ui-scale: 1;
+  --back-progress: 0;
+}
+:root[data-dynamic=true] { --accent: var(--system-primary,#007f89) }
+:root[data-mode=dark] {
+  color-scheme: dark;
+  --canvas: #101719; --surface: #1d272a; --input: #283336;
+  --ink: #f0f5f5; --muted: #a2b2b7; --accent: #79d7da;
+  --on-accent: #073338; --accent-soft: #233e42; --soft: #293538;
+  --line: #334247; --line-strong: #657b82; --danger: #ffa6a3;
+  --sage: #2a4035; --lavender: #36324e; --peach: #453c2b;
+  --blue: #263c4e; --rose: #49323b; --desktop: #080e10;
+  --glass-tint: #172a30b0; --glass-border: #ffffff38;
+  --glass-drop-tint: #97e6ed1f; --glass-rim: #d9ffff75;
+}
+@media(prefers-color-scheme:dark) {
+  :root[data-mode=system] {
+    color-scheme: dark;
+    --canvas: #101719; --surface: #1d272a; --input: #283336;
+    --ink: #f0f5f5; --muted: #a2b2b7; --accent: #79d7da;
+    --on-accent: #073338; --accent-soft: #233e42; --soft: #293538;
+    --line: #334247; --line-strong: #657b82; --danger: #ffa6a3;
+    --sage: #2a4035; --lavender: #36324e; --peach: #453c2b;
+    --blue: #263c4e; --rose: #49323b; --desktop: #080e10;
+    --glass-tint: #172a30b0; --glass-border: #ffffff38;
+    --glass-drop-tint: #97e6ed1f; --glass-rim: #d9ffff75;
+  }
+}

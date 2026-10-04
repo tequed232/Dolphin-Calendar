@@ -1,0 +1,33 @@
+// 图标在构建时内联，只包含已选子集；首启不依赖网络或字体加载。
+import home from '../assets/icons/home.svg?raw';
+import search from '../assets/icons/search.svg?raw';
+import settings from '../assets/icons/settings.svg?raw';
+import back from '../assets/icons/back.svg?raw';
+import next from '../assets/icons/next.svg?raw';
+import add from '../assets/icons/add.svg?raw';
+import close from '../assets/icons/close.svg?raw';
+import calendar from '../assets/icons/calendar.svg?raw';
+import book from '../assets/icons/book.svg?raw';
+import pin from '../assets/icons/pin.svg?raw';
+import camera from '../assets/icons/camera.svg?raw';
+import image from '../assets/icons/image.svg?raw';
+import edit from '../assets/icons/edit.svg?raw';
+import upload from '../assets/icons/upload.svg?raw';
+import sun from '../assets/icons/sun.svg?raw';
+import bell from '../assets/icons/bell.svg?raw';
+import shield from '../assets/icons/shield.svg?raw';
+import info from '../assets/icons/info.svg?raw';
+import check from '../assets/icons/check.svg?raw';
+import copy from '../assets/icons/copy.svg?raw';
+import download from '../assets/icons/download.svg?raw';
+import chevron from '../assets/icons/chevron.svg?raw';
+import clock from '../assets/icons/clock.svg?raw';
+import spark from '../assets/icons/spark.svg?raw';
+import trash from '../assets/icons/trash.svg?raw';
+import today from '../assets/icons/today.svg?raw';
+import navigate from '../assets/icons/navigate.svg?raw';
+import brand from '../assets/brand/app-icon.png';
+const sources={home,search,settings,back,next,add,close,calendar,book,pin,camera,image,edit,upload,sun,bell,shield,info,check,copy,download,chevron,clock,spark,trash,today,navigate};
+export type IconName=keyof typeof sources|'dolphin';
+const icons=Object.fromEntries(Object.entries(sources).map(([name,svg])=>[name,{viewBox:svg.match(/viewBox="([^"]+)"/)![1],body:svg.replace(/^<svg[^>]*>/,'').replace(/<\/svg>\s*$/,'')}])) as Record<keyof typeof sources,{viewBox:string;body:string}>;
+export function Icon({name,size=22}:{name:IconName;size?:number}){if(name==='dolphin')return <img className="brand-art" src={brand} width={size} height={size} alt="" aria-hidden="true"/>;const icon=icons[name];return <svg width={size} height={size} viewBox={icon.viewBox} fill="currentColor" aria-hidden="true" data-icon={name} dangerouslySetInnerHTML={{__html:icon.body}}/>;}

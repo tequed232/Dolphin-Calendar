@@ -1,0 +1,93 @@
+import assert from 'node:assert/strict';
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {launchBrowser} from './check-browser.mjs';
+
+const url=process.env.TEST_URL??'http://127.0.0.1:5173';
+const version=(await readFile('web/src/meta.ts','utf8')).match(/APP_VERSION\s*=\s*'([^']+)'/)[1];
+const browser=await launchBrowser(),context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1}),page=await context.newPage();
+const checks=[],errors=[],visualEvidence=[];page.on('pageerror',error=>errors.push(error.message));
+await mkdir('build/evidence',{recursive:true});
+async function check(name,fn){await fn();checks.push(name);console.log('PASS '+name);}
+const screen=()=>page.locator('[data-screen="holidays"].active');
+async function settings(){await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="home-settings"]').click();await page.getByRole('button',{name:'节假日标记',exact:false}).click();await screen().waitFor();}
+async function mode(value){await page.evaluate(value=>{window.__holidayMode=value;},value);}
+async function state(){return page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('dolphin-calendar',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});return new Promise((resolve,reject)=>{const request=db.transaction('state').objectStore('state').get('app');request.onsuccess=()=>{db.close();resolve(request.result);};request.onerror=()=>reject(request.error);});});}
+async function refresh(){await screen().locator('[data-action="holiday-refresh"]').click();await page.waitForFunction(()=>!document.querySelector('[data-screen="holidays"].active [data-action="holiday-refresh"]').textContent.includes('正在'));await page.waitForTimeout(100);}
+async function home(){await page.getByRole('button',{name:'首页',exact:true}).click();}
+async function selectSource(id){await screen().locator('[data-action="holiday-calendars"]').click();await screen().locator(`[data-calendar-id="${id}"]`).waitFor();for(const checkbox of await screen().locator('[data-calendar-id]').all()){await checkbox.setChecked(await checkbox.getAttribute('data-calendar-id')===id);}await screen().locator('[data-action="holiday-save-sources"]').click();await page.waitForTimeout(100);}
+async function evidenceScreenshot(name,dialog=false){
+  const selector=dialog?'dialog[open]':'.screen.active',target=page.locator(selector);
+  await target.waitFor();
+  // 等待真实的 CSS 入场完成，避免截到 dialog-in 的半透明中间帧。
+  await target.evaluate(async element=>{
+    const animations=new Set(element.getAnimations({subtree:true}));
+    for(let ancestor=element.parentElement;ancestor;ancestor=ancestor.parentElement)for(const animation of ancestor.getAnimations())animations.add(animation);
+    await Promise.all([...animations].filter(animation=>Number.isFinite(animation.effect?.getComputedTiming().iterations)&&animation.playState!=='finished').map(animation=>animation.finished.catch(()=>{})));
+  });
+  await page.waitForFunction(selector=>{
+    const element=document.querySelector(selector);if(!element)return false;
+    for(let node=element;node;node=node.parentElement)if(getComputedStyle(node).opacity!=='1')return false;
+    return !element.getAnimations({subtree:true}).some(animation=>animation.playState==='running'&&Number.isFinite(animation.effect?.getComputedTiming().iterations));
+  },selector);
+  const appearance=await target.evaluate(element=>{
+    const opacityChain=[];for(let node=element;node;node=node.parentElement)opacityChain.push({node:node.tagName.toLowerCase()+(node.id?'#'+node.id:''),opacity:getComputedStyle(node).opacity});
+    const backgroundColor=getComputedStyle(element).backgroundColor,canvas=document.createElement('canvas');canvas.width=canvas.height=1;const context=canvas.getContext('2d');context.fillStyle=backgroundColor;context.fillRect(0,0,1,1);
+    return {opacityChain,backgroundColor,backgroundAlpha:context.getImageData(0,0,1,1).data[3]};
+  });
+  for(const entry of appearance.opacityChain)assert.equal(entry.opacity,'1',`${name} 的 ${entry.node} 应完全不透明`);
+  if(dialog)assert.equal(appearance.backgroundAlpha,255,`${name} 的月历对话框背景应完全不透明`);
+  visualEvidence.push({name,dialog,...appearance});
+  await page.screenshot({path:`build/evidence/${version}-${name}.png`,animations:'disabled'});
+}
+
+try{
+  await page.clock.install({time:new Date(2026,9,2,9,0)});
+  await page.addInitScript(()=>{
+    window.__holidayMode='normal';window.__bridgeMessages=[];
+    window.Dolphin={postMessage(text){
+      const request=JSON.parse(text);window.__bridgeMessages.push(request);
+      if(!['holidayCalendars','calendarHolidays'].includes(request.type)||window.__holidayMode==='timeout')return;
+      const base={type:'holidayResult',action:request.type,success:true,permission:true,...(request.type==='calendarHolidays'?{calendarIds:request.calendarIds,from:request.from,to:request.to}:{})};
+      let reply;
+      if(window.__holidayMode==='denied')reply={...base,success:false,permission:false,message:'未获得读取系统日历权限，缓存已保留'};
+      else if(request.type==='holidayCalendars')reply={...base,calendars:window.__holidayMode==='empty'?[]:[{id:'personal',displayName:'私人日程',isSuggested:false},{id:'holidays',displayName:'中国节假日日历',isSuggested:true}]};
+      else {
+        const year=request.from.slice(0,4),days=window.__holidayMode==='delayed'?[{date:year+'-10-02',kind:'rest',title:'离开页面后保存的国庆休假',source:'中国节假日日历'}]:window.__holidayMode==='empty-days'?[]:window.__holidayMode==='refresh'?[{date:year+'-10-02',kind:'rest',title:'更新后的国庆休假',source:'中国节假日日历'},{date:year+'-10-03',kind:'makeup',title:'国庆补课',source:'中国节假日日历'}]:[{date:year+'-10-02',kind:'rest',title:'国庆休假',source:'中国节假日日历'},{date:year+'-10-03',kind:'makeup',title:'国庆补课',source:'中国节假日日历'},{date:year+'-10-04',kind:'festival',title:'校园文化节',source:'中国节假日日历'},{date:(Number(year)+1)+'-01-01',kind:'rest',title:'范围外数据不得显示',source:'中国节假日日历'}];
+        reply={...base,calendarIds:[...request.calendarIds].reverse(),from:request.from,to:request.to,days};
+      }
+      setTimeout(()=>window.dolphinNative?.(reply),window.__holidayMode==='delayed'?5000:40);
+    }};
+  });
+  await page.goto(url);await page.getByRole('button',{name:'先逛一逛',exact:true}).click();await page.waitForTimeout(100);
+  await page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('dolphin-calendar',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});const tx=db.transaction('state','readwrite'),store=tx.objectStore('state'),value=await new Promise((resolve,reject)=>{const request=store.get('app');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});value.schedule.term={name:'节假日课程验证',startDate:'2026-09-28',weeks:20};value.schedule.courses=[{id:'holiday-course',name:'休假日仍有的课程',teacher:'陈老师',room:'16栋203教室',day:5,start:3,end:4,weeks:[1],color:'sage',notes:''}];store.put(value,'app');await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();});
+  await page.reload();await page.locator('.course-card').waitFor();const originalSchedule=(await state()).schedule;
+  await settings();
+  await check('默认关闭；设置→主页有清楚入口，未读数据不自动请求权限',async()=>{assert.equal(await screen().locator('#holiday-markers').isChecked(),false);assert.equal(await screen().locator('[data-action="holiday-refresh"]').isDisabled(),true);assert.equal(await page.evaluate(()=>window.__bridgeMessages.filter(message=>/holidayCalendars|calendarHolidays/.test(message.type)).length),0);assert.match(await screen().innerText(),/仅标记日期.*不会取消、移动课程/);});
+  await check('明确选择来源，建议日历不会自动勾选；保存后才可读取',async()=>{await screen().locator('[data-action="holiday-calendars"]').click();await screen().locator('[data-calendar-id="holidays"]').waitFor();assert.equal(await screen().locator('[data-calendar-id="holidays"]').isChecked(),false);assert.equal(await screen().locator('[data-calendar-id="personal"]').isChecked(),false);await screen().locator('[data-calendar-id="holidays"]').check();assert.equal(await screen().locator('[data-action="holiday-refresh"]').isDisabled(),true);await screen().locator('[data-action="holiday-save-sources"]').click();await page.waitForTimeout(100);assert.deepEqual((await state()).holidayCalendarIds,['holidays']);await screen().locator('#holiday-markers').click();await page.waitForFunction(()=>document.querySelector('#holiday-markers').checked);await refresh();assert.match(await screen().locator('.holiday-status').innerText(),/已读取 2026 年/);const request=await page.evaluate(()=>window.__bridgeMessages.find(message=>message.type==='calendarHolidays'));assert.deepEqual(request,{type:'calendarHolidays',calendarIds:['holidays'],from:'2026-01-01',to:'2026-12-31'});assert.equal((await state()).holidays.length,3);});
+  await home();
+  await check('日期条与月历休／补／节可辨认，标题和辅助名称含节名与来源；课程不取消',async()=>{
+    const rest=page.locator('.date-item[data-date="2026-10-02"]');assert.equal(await rest.locator('.holiday-mark').innerText(),'休');assert.match(await rest.getAttribute('title'),/国庆休假.*中国节假日日历/);assert.match(await rest.getAttribute('aria-label'),/休假.*国庆休假/);assert.equal(await page.locator('.date-item[data-date="2026-10-03"] .holiday-mark').innerText(),'补');assert.equal(await page.locator('.date-item[data-date="2026-10-04"] .holiday-mark').innerText(),'节');assert.match(await page.locator('.selected-holiday').innerText(),/仅标记日期，课程与提醒按原课表安排/);assert.equal(await page.locator('.course-card:not(.other-week)').count(),1);assert.deepEqual((await state()).schedule,originalSchedule);
+    await page.getByRole('button',{name:'选择日期',exact:true}).click();await page.locator('dialog[open] .calendar-grid').waitFor();assert.equal(await page.locator('.calendar-day[data-date="2026-10-02"] .holiday-mark').innerText(),'休');assert.equal(await page.locator('.calendar-day[data-date="2026-10-03"] .holiday-mark').innerText(),'补');assert.equal(await page.locator('.calendar-day[data-date="2026-10-04"] .holiday-mark').innerText(),'节');assert.match(await page.locator('.calendar-day[data-date="2026-10-02"]').getAttribute('aria-label'),/1 门课程.*国庆休假.*中国节假日日历/);await evidenceScreenshot('holidays-calendar-light',true);await page.getByRole('button',{name:'关闭对话框',exact:true}).click();await evidenceScreenshot('holidays-home-light');
+  });
+  await check('缓存重开仍可用，未覆盖年份不显示；原生sync不发送节假日大数据',async()=>{await page.reload();await page.locator('.date-item.selected .holiday-mark').waitFor();assert.equal(await page.locator('.course-card:not(.other-week)').count(),1);await page.evaluate(()=>window.dolphinNative({type:'date',value:'2027-01-01'}));assert.equal(await page.locator('.date-item.selected .holiday-mark').count(),0);await page.evaluate(()=>window.dolphinNative({type:'date',value:'2026-10-02'}));const syncs=await page.evaluate(()=>window.__bridgeMessages.filter(message=>message.type==='sync'));assert.ok(syncs.length);for(const sync of syncs){assert.equal('holidays' in sync,false);assert.equal('holidayRanges' in sync,false);assert.equal('holidays' in sync.settings,false);}});
+  await settings();
+  await check('拒绝权限明确报告失败，保留已读缓存与课程',async()=>{const before=await state();await mode('denied');await refresh();assert.match(await screen().getByRole('alert').innerText(),/未获得读取系统日历权限/);assert.deepEqual((await state()).holidays,before.holidays);assert.deepEqual((await state()).holidayRanges,before.holidayRanges);assert.deepEqual((await state()).schedule,originalSchedule);});
+  await check('刷新替换所选年份；移除过期节日，不改变原课表',async()=>{await mode('refresh');await refresh();assert.equal((await state()).holidays.length,2);assert.equal((await state()).holidays[0].title,'更新后的国庆休假');assert.deepEqual((await state()).schedule,originalSchedule);});
+  await check('更换来源隐藏旧标记，保留失败缓存；恢复原来源无需重复读取',async()=>{await mode('normal');await selectSource('personal');await home();assert.equal(await page.locator('.date-item.selected .holiday-mark').count(),0);await settings();await selectSource('holidays');await home();await page.locator('.date-item.selected .holiday-mark').waitFor();assert.match(await page.locator('.date-item.selected').getAttribute('title'),/更新后的国庆休假/);await settings();});
+  await check('无日历源和未选择来源有说明，不误报成功',async()=>{await mode('empty');await screen().locator('[data-action="holiday-calendars"]').click();await page.waitForTimeout(100);assert.match(await screen().locator('.holiday-status').innerText(),/没有可读的日历来源/);assert.doesNotMatch(await screen().locator('.holiday-status').innerText(),/已读取/);await mode('normal');await screen().locator('[data-action="holiday-calendars"]').click();await screen().locator('[data-calendar-id="holidays"]').waitFor();await screen().locator('[data-calendar-id="holidays"]').uncheck();await screen().locator('[data-action="holiday-save-sources"]').click();await page.waitForTimeout(100);assert.deepEqual((await state()).holidayCalendarIds,[]);assert.match(await screen().locator('.holiday-status').innerText(),/未选择日历来源/);assert.equal(await screen().locator('[data-action="holiday-refresh"]').isDisabled(),true);await selectSource('holidays');});
+  await check('全年刷新含闰年366天；缓存限制最近6次年份并说明移除最早范围',async()=>{for(const year of [2027,2028,2029,2030,2031,2032]){await screen().getByRole('spinbutton',{name:'节假日年份',exact:true}).fill(String(year));await refresh();}const request=await page.evaluate(()=>window.__bridgeMessages.find(message=>message.type==='calendarHolidays'&&message.from==='2028-01-01'));assert.equal(request.to,'2028-12-31');assert.equal((Date.parse(request.to)-Date.parse(request.from))/86400000+1,366);assert.equal((await state()).holidayRanges.length,6);assert.ok((await state()).holidayRanges.every(range=>range.from>='2027-01-01'));assert.match(await screen().locator('.holiday-status').innerText(),/移除最早读取.*最近 6/);assert.ok((await state()).holidays.length<=12000);await screen().getByRole('spinbutton',{name:'节假日年份',exact:true}).fill('2026');await refresh();});
+  await check('读取超时保留缓存并明确提示，空年成功说明不推算放假',async()=>{const before=await state();await mode('timeout');await screen().locator('[data-action="holiday-refresh"]').click();await page.clock.fastForward(26000);assert.match(await screen().getByRole('alert').innerText(),/暂未回复.*缓存已保留/);assert.deepEqual((await state()).holidays,before.holidays);await mode('empty-days');await screen().getByRole('spinbutton',{name:'节假日年份',exact:true}).fill('2033');await refresh();assert.match(await screen().locator('.holiday-status').innerText(),/没有提供.*不会推算/);await mode('normal');await screen().getByRole('spinbutton',{name:'节假日年份',exact:true}).fill('2026');await refresh();});
+  await check('离开页面后延迟成功仍保存；返回显示进行中或成功状态，未匹配回复不能污染缓存',async()=>{
+    const before=await state();await mode('delayed');await screen().getByRole('spinbutton',{name:'节假日年份',exact:true}).fill('2028');await screen().locator('[data-action="holiday-refresh"]').click();await home();assert.equal(await screen().count(),0);
+    await page.evaluate(()=>window.dolphinNative({type:'holidayResult',action:'calendarHolidays',success:true,permission:true,calendarIds:['personal'],from:'2028-01-01',to:'2028-12-31',days:[{date:'2028-10-02',kind:'makeup',title:'错误来源不得保存',source:'私人日程'}]}));assert.deepEqual((await state()).holidays,before.holidays);
+    await settings();assert.match(await screen().locator('.holiday-status').innerText(),/正在读取 2028 年/);assert.equal(await screen().getByRole('spinbutton',{name:'节假日年份',exact:true}).inputValue(),'2028');assert.equal(await screen().locator('[data-action="holiday-refresh"]').isDisabled(),true);await home();await page.clock.fastForward(5500);
+    await page.waitForFunction(async()=>{const db=await new Promise(resolve=>{const request=indexedDB.open('dolphin-calendar',1);request.onsuccess=()=>resolve(request.result);});return new Promise(resolve=>{const request=db.transaction('state').objectStore('state').get('app');request.onsuccess=()=>{db.close();resolve(request.result.holidays.some(day=>day.date==='2028-10-02'&&day.title==='离开页面后保存的国庆休假'));};});});assert.deepEqual((await state()).schedule,originalSchedule);
+    await settings();assert.match(await screen().locator('.holiday-status').innerText(),/已读取 2028 年/);assert.equal(await screen().getByRole('spinbutton',{name:'节假日年份',exact:true}).inputValue(),'2028');assert.equal(await screen().locator('[data-action="holiday-refresh"]').isDisabled(),false);
+    const saved=await state();await page.evaluate(()=>window.dolphinNative({type:'holidayResult',action:'calendarHolidays',success:true,permission:true,calendarIds:['holidays'],from:'2028-01-01',to:'2028-12-31',days:[{date:'2028-10-02',kind:'makeup',title:'无待处理请求不得保存',source:'中国节假日日历'}]}));assert.deepEqual((await state()).holidays,saved.holidays);
+    await mode('normal');await screen().getByRole('spinbutton',{name:'节假日年份',exact:true}).fill('2026');await refresh();
+  });
+  await home();
+  await check('320px深色窄屏，选中日期字色清楚，标记与日期数字不重叠',async()=>{await page.setViewportSize({width:320,height:760});await page.evaluate(()=>{document.documentElement.dataset.mode='dark';});await page.getByRole('button',{name:'选择日期',exact:true}).click();await page.locator('dialog[open] .calendar-grid').waitFor();const day=page.locator('.calendar-day[data-date="2026-10-02"]');assert.equal(await day.locator('b').evaluate(element=>getComputedStyle(element).color),await day.locator('span').evaluate(element=>getComputedStyle(element).color));const geometry=await day.evaluate(element=>{const badge=element.querySelector('b').getBoundingClientRect(),number=element.querySelector('span').getBoundingClientRect();return {badge:{x:badge.x,y:badge.y,right:badge.right,bottom:badge.bottom},number:{x:number.x,y:number.y,right:number.right,bottom:number.bottom}};});assert.ok(geometry.badge.right<=geometry.number.x||geometry.badge.x>=geometry.number.right||geometry.badge.bottom<=geometry.number.y||geometry.badge.y>=geometry.number.bottom,'标记不可覆盖日期数字');const darkColor=await page.locator('.calendar-day[data-date="2026-10-03"] .holiday-mark').evaluate(element=>getComputedStyle(element).color);assert.equal(darkColor,'rgb(194, 215, 237)');assert.equal(await page.locator('.calendar-grid').evaluate(element=>element.scrollWidth>element.clientWidth+1),false);await evidenceScreenshot('holidays-calendar-dark-narrow',true);await page.getByRole('button',{name:'关闭对话框',exact:true}).click();await evidenceScreenshot('holidays-home-dark-narrow');});
+  assert.deepEqual(errors,[]);
+  await writeFile(`build/evidence/${version}-holidays-results.json`,JSON.stringify({version,completed:true,checks,errors,visualEvidence,scope:'隔离浏览器与模拟系统日历桥；不修改手机和用户数据'},null,2));
+}finally{await context.close();await browser.close();}
