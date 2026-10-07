@@ -18,6 +18,6 @@
 
 “复制 JSON 提示词”等按钮仅在用户明确点击时写入文本，不读取剪贴板，不查询或申请剪贴板权限。剪贴板写入由浏览器处理；离线浏览器不支持时使用本地复制备用流程。
 
-更新检查每日采用非精确调度，不请求开机或后台弹出权限；设备重启后打开 App 恢复并补查当天遗漏的检查。应用内下载通过系统 DownloadManager 写入应用专属下载目录，不申请广泛存储访问，不请求自动安装权限。下载完成后用户在系统下载列表打开安装包，由系统处理安装确认。课表和封面不发送到 GitHub。
+更新检查每日采用非精确调度，不请求开机或后台弹出权限；设备重启后打开 App 恢复并补查当天遗漏的检查。应用内下载通过系统 DownloadManager：Android 10+ 写入公共下载目录，旧系统写入应用专属下载目录，不申请广泛存储访问，不请求自动安装权限。下载完成后用户在系统下载列表打开安装包，由系统处理安装确认。课表和封面不发送到 GitHub。下载位置与权限依据 [Android DownloadManager 文档](https://developer.android.com/reference/android/app/DownloadManager.Request#setDestinationInExternalPublicDir(java.lang.String,%20java.lang.String))。
 
 AndroidX 可能在合并后的 Manifest 中生成以应用包名开头、保护动态广播接收器的内部 `signature` 权限。它不是额外的用户运行时授权，也不提供自启动或后台弹出能力。源码守卫检查应用的五项系统权限允许列表和原生入口，Android 构建后还需核对合并 Manifest。

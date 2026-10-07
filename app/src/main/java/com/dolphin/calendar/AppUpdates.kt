@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
+import android.os.Build
 import org.json.JSONObject
 import java.net.URL
 import java.time.LocalDate
@@ -136,7 +137,10 @@ object AppUpdates {
             .setDescription("完成后点开系统下载列表，由你确认安装")
             .setMimeType("application/vnd.android.package-archive")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, filename)
+        // Android 10+ hides app-private downloads in the system Downloads UI.
+        // Its DownloadManager can write to public Downloads without a storage permission.
+        if (Build.VERSION.SDK_INT >= 29) request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+        else request.setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, filename)
         val id = context.getSystemService(DownloadManager::class.java).enqueue(request)
         prefs(context).edit().putLong("downloadId", id).putString("downloadVersion", release.getString("version")).apply()
     }
