@@ -28,6 +28,13 @@ try{
   await page.goto(url);
   await page.evaluate(()=>caches.open('dolphin-other-project-preserve'));
   await page.getByRole('button',{name:'先逛一逛',exact:true}).click();
+  assert.equal(await page.locator('.today-fab').count(),0);
+  const today=page.locator('.week-controls').getByRole('button',{name:'回到今天',exact:true});
+  await page.getByRole('button',{name:'下一周',exact:true}).click();assert.notEqual(await page.locator('.greeting h1').innerText(),'今天');
+  await today.click();assert.equal(await page.locator('.greeting h1').innerText(),'今天');
+  await page.setViewportSize({width:320,height:800});
+  assert.equal(await page.locator('.month-row').evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
+  await page.setViewportSize({width:390,height:844});
   assert.equal(await page.locator('.brand-art').first().evaluate(img=>img.complete&&img.naturalWidth>0),true);
   const icons=await page.evaluate(async()=>Promise.all([...document.querySelectorAll('link[rel="icon"],link[rel="apple-touch-icon"]')].map(async link=>{const img=new Image();img.src=link.href;await img.decode();return img.naturalWidth;})));
   assert.deepEqual(icons,[32,180]);

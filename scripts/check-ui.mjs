@@ -134,10 +134,10 @@ try{
   const after=await nav.boundingBox();assert.ok(after);assert.ok(Math.abs(after.y-before.y)<1);
   assert.deepEqual(await backdropPixels(),backgroundBefore,'滚动后视口边缘的背景像素应保持原位');
   const host=await nav.evaluate(el=>el.parentElement?.parentElement?.parentElement?.id);assert.equal(host,'home-actions-portal');
-  for(const button of [page.getByRole('button',{name:'今天',exact:true}),page.getByRole('button',{name:'导航课程',exact:true})]){
+  for(const button of [page.getByRole('button',{name:'导航课程',exact:true})]){
    assert.equal(await button.innerText(),'');const bounds=await button.boundingBox();assert.equal(Math.round(bounds.width),52);assert.equal(Math.round(bounds.height),52);assert.equal(await button.locator('svg').count(),1);
   }
-  assert.equal(await page.locator('.today-fab [data-icon]').getAttribute('data-icon'),'today');assert.equal(await nav.locator('[data-icon]').getAttribute('data-icon'),'navigate');
+  assert.equal(await page.locator('.today-fab').count(),0);assert.equal(await page.locator('.week-controls').getByRole('button',{name:'回到今天',exact:true}).count(),1);assert.equal(await nav.locator('[data-icon]').getAttribute('data-icon'),'navigate');
   await page.locator('.screen.active').evaluate(el=>{el.scrollTop=0;});
   await page.screenshot({path:`build/evidence/${version}-home-actions.png`});
  });
