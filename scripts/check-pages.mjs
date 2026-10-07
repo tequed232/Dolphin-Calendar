@@ -9,13 +9,15 @@ const html=await readFile(path.join(root,'index.html'),'utf8');
 assert.match(html,/<script type="module">/);
 assert.doesNotMatch(html,/<script[^>]+src=|src\/main\.tsx/);
 const misses=[];
+let legacyWorker=true;
+const legacyScript=`const CACHE='dolphin-'+self.registration.scope+'-legacy';self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./','./index.html'])).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.addEventListener('fetch',e=>{if(e.request.method==='GET'&&e.request.url.startsWith(self.registration.scope))e.respondWith(caches.open(CACHE).then(c=>c.match(e.request)).then(c=>c||fetch(e.request)));});`;
 const server=createServer(async(req,res)=>{
   try{
     const pathname=new URL(req.url,'http://localhost').pathname;
     if(!pathname.startsWith(prefix))throw new Error('outside project');
     const filename=path.resolve(root,decodeURIComponent(pathname.slice(prefix.length))||'index.html');
     if(!filename.startsWith(root+path.sep))throw new Error('outside build');
-    const body=await readFile(filename);
+    const body=legacyWorker&&filename===path.join(root,'sw.js')?legacyScript:await readFile(filename);
     const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml'};
     res.writeHead(200,{'Content-Type':types[path.extname(filename)]??'application/octet-stream'});res.end(body);
   }catch{misses.push(req.url);res.writeHead(404);res.end();}
@@ -46,6 +48,25 @@ try{
   await page.reload();
   assert.equal(await page.evaluate(()=>!!navigator.serviceWorker.controller),true);
   assert.equal(await page.evaluate(()=>caches.has('dolphin-other-project-preserve')),true);
+  await page.evaluate(async()=>{
+    const prefix='dolphin-'+(await navigator.serviceWorker.ready).scope+'-';
+    const cache=await caches.open((await caches.keys()).find(key=>key.startsWith(prefix)));
+    for(const relative of ['./','./index.html'])await cache.put(new URL(relative,location.href).href,new Response('<html><head><link rel="icon" href="data:,"></head><body>stale-home</body></html>',{headers:{'Content-Type':'text/html'}}));
+  });
+  await page.reload();assert.match(await page.locator('body').innerText(),/stale-home/);
+  legacyWorker=false;
+  await page.evaluate(async()=>{
+    const registration=await navigator.serviceWorker.ready;
+    const changed=new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true}));
+    await registration.update();await changed;
+  });
+  await page.reload();await page.getByRole('button',{name:'搜索',exact:true}).click();await page.locator('.screen.active .result-card').waitFor();assert.match(await page.locator('.screen.active .result-card').innerText(),/网页导入验证/);
+  await page.evaluate(async()=>{
+    const prefix='dolphin-'+(await navigator.serviceWorker.ready).scope+'-';
+    const cache=await caches.open((await caches.keys()).find(key=>key.startsWith(prefix)));
+    await cache.put(new URL('./',location.href).href,new Response('<html><head><link rel="icon" href="data:,"></head><body>stale-home</body></html>',{headers:{'Content-Type':'text/html'}}));
+  });
+  await page.reload();await page.getByRole('button',{name:'搜索',exact:true}).click();await page.locator('.screen.active .result-card').waitFor();
   await context.setOffline(true);await page.reload();await page.getByRole('button',{name:'搜索',exact:true}).click();await page.locator('.screen.active .result-card').waitFor();
   assert.deepEqual(misses,[]);assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
   await mkdir('build/evidence',{recursive:true});await page.screenshot({path:'build/evidence/1.4.2-pages.png'});
