@@ -26,7 +26,8 @@ async function next(page){await page.getByRole('button',{name:'继续',exact:tru
 async function finalStep(page){await next(page);await next(page);await page.locator('.onboarding[data-step="3"]').waitFor();}
 async function stored(page){return page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('dolphin-calendar',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});const data=await new Promise((resolve,reject)=>{const r=db.transaction('state').objectStore('state').get('app');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});db.close();return data;});}
 async function assertNoPermission(page){
-  const messages=await page.evaluate(()=>window.__guideNative),allowed=new Set(['ready','appearance','sync','bookCovers','haptic','history']);
+  // updateStatus reads cached metadata only; it cannot request a permission or start a download.
+  const messages=await page.evaluate(()=>window.__guideNative),allowed=new Set(['ready','appearance','sync','bookCovers','haptic','history','updateStatus']);
   assert.deepEqual(messages.filter(message=>!allowed.has(message.type)),[],'引导或快捷设置入口不应申请权限、读取日历或启动实时服务');
   assert.deepEqual(await page.evaluate(()=>window.__guideRejections),[]);
 }
