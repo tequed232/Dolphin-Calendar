@@ -1,7 +1,7 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {native} from '../lib/native';
 export type Tab='home'|'search'|'settings';
-export type Route='home-settings'|'holidays'|'editor'|'import'|'books'|'appearance'|'background'|'notifications'|'safe-area'|'navigation'|'about'|'calendar'|'interface';
+export type Route='home-settings'|'holidays'|'editor'|'import'|'books'|'appearance'|'background'|'notifications'|'safe-area'|'navigation'|'about'|'updates'|'calendar'|'interface';
 function requestLeave(proceed:()=>void){const event=new CustomEvent('dolphin-leave-page',{cancelable:true,detail:proceed});const allowed=window.dispatchEvent(event);if(allowed)proceed();return allowed;}
 export function useNavigation(overlayBack:()=>boolean,hasOverlay:boolean){
   const [tab,setTab]=useState<Tab>('home'),[stack,setStack]=useState<Route[]>([]),[returning,setReturning]=useState(false);

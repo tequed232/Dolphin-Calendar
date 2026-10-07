@@ -26,6 +26,7 @@ export function App(){
   useEffect(()=>{if(ready&&!data.onboarded)setIntro(true);},[ready]);
   useEffect(()=>{
     window.dolphinNative=(event)=>{
+      if(event.type==='updateStatus'&&event.update)window.dispatchEvent(new CustomEvent('dolphin-update',{detail:event.update}));
       if(event.type==='message')toast(event.message??'');
       if(event.type==='calendarResult')window.dispatchEvent(new CustomEvent('dolphin-calendar',{detail:event}));
       if(event.type==='holidayResult')window.dispatchEvent(new CustomEvent('dolphin-holiday',{detail:event}));
@@ -51,11 +52,12 @@ export function App(){
   }
   function openImport(){nav.select('settings');nav.push('import');}
   function addCourse(){nav.select('settings');nav.push('editor');setEditing({course:null});}
+  function openUpdates(){nav.select('settings');nav.push('updates');}
   async function finishIntro(next?:()=>void){if(introSaving.current)return;introSaving.current=true;try{if(!data.onboarded)await update(s=>({...s,onboarded:true}));setIntro(false);next?.();}finally{introSaving.current=false;}}
   const top=nav.stack.length-1;
   return <><main className="app-shell"><AppBackground image={data.background} enabled={data.settings.backgroundEnabled}/>
   {error?<div className="fatal-error" role="alert"><Icon name="shield"/><h2>本地数据暂时不可用</h2><p>{error}</p><button className="primary" onClick={()=>location.reload()}>重试读取</button></div>:<>
-  <div className="screen-host" inert={!ready}>{(['home','search','settings'] as const).map(tab=>{const active=tab===nav.tab,preview=active&&nav.stack.length===1;return <section key={tab} className={`screen tab-screen ${active?'selected-tab':''} ${active&&!nav.stack.length?'active':''} ${preview?'previous-screen':''}`} aria-hidden={!active||nav.stack.length>0} inert={!active||nav.stack.length>0} data-screen={tab}>{tab==='home'?<Home openCourse={openCourse} openImport={openImport} addCourse={addCourse} navigate={navigate} visible={active&&!nav.stack.length}/>:tab==='search'?<Search openCourse={openCourse} openImport={openImport} addCourse={addCourse}/>:<SettingsHome push={nav.push}/>}</section>;})}
+  <div className="screen-host" inert={!ready}>{(['home','search','settings'] as const).map(tab=>{const active=tab===nav.tab,preview=active&&nav.stack.length===1;return <section key={tab} className={`screen tab-screen ${active?'selected-tab':''} ${active&&!nav.stack.length?'active':''} ${preview?'previous-screen':''}`} aria-hidden={!active||nav.stack.length>0} inert={!active||nav.stack.length>0} data-screen={tab}>{tab==='home'?<Home openUpdates={openUpdates} openCourse={openCourse} openImport={openImport} addCourse={addCourse} navigate={navigate} visible={active&&!nav.stack.length}/>:tab==='search'?<Search openCourse={openCourse} openImport={openImport} addCourse={addCourse}/>:<SettingsHome push={nav.push}/>}</section>;})}
   {nav.stack.map((route,i)=><section key={`${i}-${route}`} className={`screen sub-screen ${i===top?'active':''} ${i===top-1?'previous-screen':''} ${i===top&&nav.returning?'returning':''}`} aria-hidden={i!==top} inert={i!==top} data-screen={route}><div className="page-inner"><header className="sub-header"><button className="icon-button" aria-label="返回上一页" onClick={nav.back}><Icon name="back"/></button><h1>{ROUTE_TITLES[route]}</h1><span/></header>{route==='import'?<Import done={()=>nav.select('home')}/>:<SettingsPage route={route} push={nav.push} editCourse={c=>setEditing({course:c})} openCourse={openCourse} showIntro={()=>setIntro(true)}/>}</div></section>)}
   </div><div id="home-actions-portal"/><GlassDock enabled={data.settings.glassMode!=='off'} distortion={data.settings.distortion} activeIndex={(['home','search','settings'] as const).indexOf(nav.tab)} onSelect={index=>selectTab((['home','search','settings'] as const)[index])}>{(['home','search','settings'] as const).map((tab,i)=><button key={tab} aria-current={nav.tab===tab?'page':undefined} onClick={()=>selectTab(tab)}><span className="dock-content"><span className="dock-icon"><Icon name={tab} size={24}/></span><span>{['首页','搜索','设置'][i]}</span></span></button>)}</GlassDock></>}
   {!ready&&!error&&<div className="startup-state load-note" role="status"><Icon name="dolphin" size={48}/><strong>正在读取本地课表…</strong></div>}

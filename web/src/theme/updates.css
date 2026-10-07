@@ -1,0 +1,8 @@
+.home-header-actions{display:flex;align-items:center;gap:10px}
+.update-indicator{width:44px;height:44px;min-width:44px;display:grid;place-items:center;border-radius:50%;background:#ffd85b;color:#493800;box-shadow:0 2px 8px #49380018}
+.update-indicator:active{transform:scale(.95)}
+.update-summary{text-align:center;margin:8px 0 22px}
+.update-symbol{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 14px;border-radius:50%;background:#ffd85b;color:#493800}
+.update-summary p{color:var(--muted);font-size:13px;line-height:1.7}
+.update-notes{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.7}
+[data-screen=updates] .form-card>.primary,[data-screen=updates] .form-card>.secondary{width:100%;margin-top:12px}

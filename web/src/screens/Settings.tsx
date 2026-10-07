@@ -4,6 +4,7 @@ import {Icon,type IconName} from '../components/Icon';
 import {SystemCalendar} from './SystemCalendar';
 import {Background} from './Background';
 import {Holidays} from './Holidays';
+import {Updates} from './Updates';
 import {ChoiceSelect} from '../components/ChoiceSelect';
 import {CalendarPicker} from '../components/CalendarPicker';
 import {PageLeaveGuard} from '../components/PageLeaveGuard';
@@ -22,7 +23,7 @@ export const SETTINGS_GROUPS:{title:string;route:Route;description:string;icon:I
   {title:'导航与学校',route:'navigation',description:'填写学校，选择前往楼栋的地图',icon:'pin'},
   {title:'关于',route:'about',description:'Dolphin Calendar · '+APP_VERSION,icon:'info'}
 ];
-export const ROUTE_TITLES:Record<Route,string>={...Object.fromEntries(SETTINGS_GROUPS.map(g=>[g.route,g.title])),import:'导入课表',books:'我的教材',calendar:'系统日历',interface:'课表转换说明',background:'背景',holidays:'节假日标记','safe-area':'屏幕安全区'} as Record<Route,string>;
+export const ROUTE_TITLES:Record<Route,string>={...Object.fromEntries(SETTINGS_GROUPS.map(g=>[g.route,g.title])),import:'导入课表',books:'我的教材',calendar:'系统日历',interface:'课表转换说明',updates:'应用更新',background:'背景',holidays:'节假日标记','safe-area':'屏幕安全区'} as Record<Route,string>;
 export function SettingsHome({push}:{push:(r:Route)=>void}){
   const sections=[
     {title:'课程与日常',items:SETTINGS_GROUPS.slice(0,2)},
@@ -125,6 +126,7 @@ export function SettingsPage({route,push,editCourse,openCourse,showIntro}:{route
   if(route==='navigation')return <md-card className="form-card"><label className="field">学校名称<input placeholder="例如：浙江大学紫金港校区" value={s.school} onChange={e=>set('school',e.target.value)}/></label><Select label="导航地图" value={s.map} onChange={v=>set('map',v as Preferences['map'])}><option value="amap">高德地图</option><option value="baidu">百度地图</option></Select><p className="muted">地图只搜索学校名与楼栋，完整教室号继续留在课程和通知里供你查看。仅点击导航时才会离开本地应用。</p><p className="hint">校内建筑定位依赖导航软件收录情况，找不到时请核对学校和楼名。</p></md-card>;
   if(route==='calendar')return <SystemCalendar/>;
   if(route==='interface')return <><p className="page-purpose">截图和教务页面需要先转换为 JSON，再导入课表。</p><md-card className="form-card"><h3>已有 JSON？直接导入</h3><p className="muted">粘贴内容或选择 .json 文件，检查课程预览和开学日期后确认。</p><h3>只有截图或网页？先转换</h3><p className="muted">在导入页复制转换提示词，交给你选择的工具整理。确认结果包含课程名、星期、节次和周次，再回到这里导入。</p><button className="secondary full" onClick={()=>push('import')}>查看转换提示词与导入教程</button><p className="hint">导入解析在本机完成。使用外部工具转换时，请自行确认分享的内容。</p></md-card></>;
-  if(route==='about')return <><div className="about-hero"><span className="avatar"><Icon name="dolphin" size={50}/></span><h2>Dolphin Calendar</h2><p>把校园日常，轻轻放在一起。</p><span className="version-tag">V{APP_VERSION}</span></div><md-card className="form-card"><LinkRow title="重新查看使用引导" detail="导入课表、上课行程与外观设置" onClick={showIntro} icon="info"/><a className="setting-row link-row author-link" href={GITHUB_PROFILE_URL} target="_blank" rel="noopener noreferrer" onClick={event=>{if(isNative()){event.preventDefault();native("openExternal",{url:GITHUB_PROFILE_URL});}}}><span><strong>作者 GitHub</strong><small>tequed232 · 查看公开项目</small></span><Icon name="chevron"/></a><Toggle id="dynamic-color" label="动态取色" description="Android 12 及以上读取系统主题色" value={s.dynamicColor} onChange={v=>{set('dynamicColor',v);if(v)native('theme');}}/><h3>本地，始终是本地</h3><p className="muted">课表与封面存放于 IndexedDB。卸载应用或清除浏览器数据会删除本地内容；建议定期导出课表。</p><h3>开源组件</h3><p className="muted">React / React DOM · MIT<br/>Vite · MIT<br/>TypeScript · Apache-2.0<br/>AndroidX WebKit / Core · Apache-2.0<br/>Kotlin · Apache-2.0</p><p className="hint">完整许可随源码包的 THIRD_PARTY_NOTICES.md 提供。</p></md-card></>;
+  if(route==='updates')return <Updates/>;
+  if(route==='about')return <><div className="about-hero"><span className="avatar"><Icon name="dolphin" size={50}/></span><h2>Dolphin Calendar</h2><p>把校园日常，轻轻放在一起。</p><span className="version-tag">V{APP_VERSION}</span></div><md-card className="form-card"><LinkRow title="应用更新" detail="每天检查新版本，管理下载方式" onClick={()=>push('updates')} icon="download"/><LinkRow title="重新查看使用引导" detail="导入课表、上课行程与外观设置" onClick={showIntro} icon="info"/><a className="setting-row link-row author-link" href={GITHUB_PROFILE_URL} target="_blank" rel="noopener noreferrer" onClick={event=>{if(isNative()){event.preventDefault();native("openExternal",{url:GITHUB_PROFILE_URL});}}}><span><strong>作者 GitHub</strong><small>tequed232 · 查看公开项目</small></span><Icon name="chevron"/></a><Toggle id="dynamic-color" label="动态取色" description="Android 12 及以上读取系统主题色" value={s.dynamicColor} onChange={v=>{set('dynamicColor',v);if(v)native('theme');}}/><h3>本地，始终是本地</h3><p className="muted">课表与封面存放于 IndexedDB。卸载应用或清除浏览器数据会删除本地内容；建议定期导出课表。</p><h3>开源组件</h3><p className="muted">React / React DOM · MIT<br/>Vite · MIT<br/>TypeScript · Apache-2.0<br/>AndroidX WebKit / Core · Apache-2.0<br/>Kotlin · Apache-2.0</p><p className="hint">完整许可随源码包的 THIRD_PARTY_NOTICES.md 提供。</p></md-card></>;
   return null;
 }

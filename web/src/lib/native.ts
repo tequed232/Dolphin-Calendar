@@ -1,5 +1,6 @@
 import type {HolidayCalendar,HolidayDay} from './model';
-export type NativeMessage = {type:string;message?:string;value?:string;courseId?:string;primary?:string;dark?:boolean;action?:string;success?:boolean;permission?:boolean;count?:number;busy?:boolean;canRestore?:boolean;calendars?:HolidayCalendar[];days?:HolidayDay[];calendarIds?:string[];from?:string;to?:string};
+import type {UpdateStatus} from '../state/useAppUpdates';
+export type NativeMessage = {type:string;update?:UpdateStatus;message?:string;value?:string;courseId?:string;primary?:string;dark?:boolean;action?:string;success?:boolean;permission?:boolean;count?:number;busy?:boolean;canRestore?:boolean;calendars?:HolidayCalendar[];days?:HolidayDay[];calendarIds?:string[];from?:string;to?:string};
 declare global {
   interface Window {
     Dolphin?: { postMessage(value:string):void };

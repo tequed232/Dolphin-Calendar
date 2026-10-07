@@ -90,6 +90,6 @@ class ScheduleChangedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if(intent.action !in setOf(Intent.ACTION_MY_PACKAGE_REPLACED,Intent.ACTION_TIME_CHANGED,Intent.ACTION_TIMEZONE_CHANGED)) return
         val pending=goAsync();val app=context.applicationContext
-        Thread { try { ReminderScheduler.schedule(app); Notifications.pet(app) } finally { pending.finish() } }.start()
+        Thread { try { ReminderScheduler.schedule(app); Notifications.pet(app); AppUpdates.schedule(app) } finally { pending.finish() } }.start()
     }
 }

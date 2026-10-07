@@ -8,6 +8,7 @@ export type HolidayDay = {date:string;kind:HolidayKind;title:string;source:strin
 export type HolidayCalendar = {id:string;displayName:string;isSuggested:boolean};
 export type HolidayRange = {from:string;to:string;calendarIds:string[]};
 export type Settings = {
+  autoUpdate:boolean; directDownload:boolean;
   mode: 'system' | 'light' | 'dark'; scale: number; showNavigation: boolean; showWeekend: boolean; firstDay: number; holidayMarkers:boolean;
   topAuto: boolean; bottomAuto: boolean; topInset: number; bottomInset: number;
   glass: boolean; glassMode:'off'|'partial'|'full'; dispersion: number; scattering: number; distortion: number; backgroundEnabled:boolean; backgroundBlur:number; performance: 'auto' | 'high';
@@ -34,7 +35,7 @@ export function coursePeriod(course:Course,schedule:Schedule){const first=schedu
 export function initialData(): AppData {
   const startDate = dateKey(monday(new Date()));
   return { schema: 1, appearanceRevision: 2, schedule: {term:{name:'我的新学期',startDate,weeks:20}, periods:DEFAULT_PERIODS,courses:[]},books:{},onboarded:false,holidays:[],holidayCalendarIds:[],holidaySourceNames:[],holidayRanges:[],
-    settings: {mode:'system',scale:1,showNavigation:true,showWeekend:true,firstDay:1,holidayMarkers:false,topAuto:true,bottomAuto:true,topInset:24,bottomInset:20,glass:true,glassMode:'partial',dispersion:1,scattering:1,distortion:1,backgroundEnabled:false,backgroundBlur:12,performance:'auto',notificationsEnabled:true,reminders:false,advance:10,journeyLive:true,pet:false,poke:true,lines:'下一站，知识的海洋。\n带好教材，我们出发吧！',school:'',map:'amap',dynamicColor:false} };
+    settings: {autoUpdate:true,directDownload:false,mode:'system',scale:1,showNavigation:true,showWeekend:true,firstDay:1,holidayMarkers:false,topAuto:true,bottomAuto:true,topInset:24,bottomInset:20,glass:true,glassMode:'partial',dispersion:1,scattering:1,distortion:1,backgroundEnabled:false,backgroundBlur:12,performance:'auto',notificationsEnabled:true,reminders:false,advance:10,journeyLive:true,pet:false,poke:true,lines:'下一站，知识的海洋。\n带好教材，我们出发吧！',school:'',map:'amap',dynamicColor:false} };
 }
 export function sampleSchedule(): Schedule {
   const base=initialData().schedule;

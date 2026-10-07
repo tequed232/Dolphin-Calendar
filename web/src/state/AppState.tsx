@@ -4,7 +4,8 @@ import { loadData, saveData } from '../lib/storage';
 import { native } from '../lib/native';
 import { notificationCover } from '../lib/notificationCover';
 import {useHolidayReader} from './useHolidayReader';
-type Context = { data:AppData;ready:boolean;error:string; update:(fn:(previous:AppData)=>AppData)=>Promise<void>;toast:(message:string)=>void;holidayReader:ReturnType<typeof useHolidayReader> };
+import {useAppUpdates} from './useAppUpdates';
+type Context = { data:AppData;ready:boolean;error:string; update:(fn:(previous:AppData)=>AppData)=>Promise<void>;toast:(message:string)=>void;holidayReader:ReturnType<typeof useHolidayReader>;appUpdates:ReturnType<typeof useAppUpdates> };
 const AppContext=createContext<Context>(null!);
 export function AppProvider({children}:{children:ReactNode}) {
   const [data,setData]=useState(initialData),[ready,setReady]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
@@ -21,6 +22,7 @@ export function AppProvider({children}:{children:ReactNode}) {
     queue.current=task.catch(()=>{});try{await task;}catch(e){toast(`保存失败：${(e as Error).message}`);throw e;}
   }
   const holidayReader=useHolidayReader(data,update);
+  const appUpdates=useAppUpdates();
   useEffect(()=>{
     if(!ready) return;
     let active=true;
@@ -37,6 +39,6 @@ export function AppProvider({children}:{children:ReactNode}) {
     })();
     return()=>{active=false;};
   },[ready,data.schedule,data.settings,data.books]);
-  return <AppContext.Provider value={{data,ready,error,update,toast,holidayReader}}>{children}{message&&<div className="toast" role="status">{message}</div>}</AppContext.Provider>;
+  return <AppContext.Provider value={{data,ready,error,update,toast,holidayReader,appUpdates}}>{children}{message&&<div className="toast" role="status">{message}</div>}</AppContext.Provider>;
 }
 export const useApp=()=>useContext(AppContext);

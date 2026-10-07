@@ -8,7 +8,7 @@
 
 Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 React 界面提供网页版和 Android 安装版：主页看课程，点击课程看教师、教室和教材，需要时再开启提醒、导航或系统日历。
 
-无需账号，没有业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。本文对应 **1.4.2 源码**，各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
+无需账号，没有业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。本文对应 **1.4.3 源码**，各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
 
 在线使用：[Dolphin Calendar 网页版](https://tequed232.github.io/Dolphin-Calendar/)。网页版发布运行 `npm run build:pages`，入口为 `build/pages/index.html`。该入口内置编译后的界面代码和样式，图片与离线缓存文件随整个目录发布，支持 `/Dolphin-Calendar/` 子路径。不要将开发用的 `web/index.html` 单独上传。发布工作流和 Pages 发布条件见 [发布说明](docs/PUBLISHING.md)。
 
@@ -22,6 +22,12 @@ Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 Re
 *截图中的课程、教师和地点为演示数据。界面支持浅色、深色与跟随系统。*
 
 ## 功能概览
+
+### 应用更新（Android）
+
+设置 → 关于 → 应用更新可开启每日自动检查，也可立即检查。发现比当前更新的正式 Release 后，主页右上角显示黄色下载入口。自动检查默认开启，只检查版本；应用内下载为独立开关，默认关闭。开启后仍需手动下载，完成后到系统下载列表打开 APK，由系统确认安装。也可直接前往作者 GitHub Release 页面。
+
+检查只访问作者仓库的公开发布信息，不上传课表、封面或背景。每日检查采用非精确调度，可能受省电影响；重启后重新打开 App 会恢复并补查。网页自身通过网站发布更新，不执行 APK 检查与下载。
 
 ### 实时通知与导航
 

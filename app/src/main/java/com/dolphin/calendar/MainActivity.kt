@@ -53,6 +53,7 @@ class MainActivity : Activity() {
     private var exportText: String? = null
     private var pendingTestNotification = false
     private var pendingJourney: JSONObject? = null
+    private var stopObservingUpdates: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,6 +63,7 @@ class MainActivity : Activity() {
         web = EdgeWebView()
         web.setBackgroundColor(Color.rgb(247,247,247))
         setContentView(web)
+        stopObservingUpdates = AppUpdates.observe { updatesStatus() }
         with(web.settings) {
             javaScriptEnabled = true; domStorageEnabled = true
             allowFileAccess = false; allowContentAccess = true
@@ -152,6 +154,7 @@ class MainActivity : Activity() {
             web.systemGestureExclusionRects = if(canGoBack) listOf(Rect(0, (middle-100*dp).toInt(), (24*dp).toInt(), (middle+100*dp).toInt())) else emptyList()
         }
     }
+    private fun updatesStatus() { runOnUiThread { if(!isDestroyed) send(JSONObject().put("type","updateStatus").put("update",AppUpdates.state(this))) } }
     private fun send(event: JSONObject) { if(pageReady) web.evaluateJavascript("window.dolphinNative?.($event)", null) }
     private fun message(text: String) = send(JSONObject().put("type", "message").put("message", text))
     private fun openExternal(uri: Uri): Boolean {
@@ -252,12 +255,16 @@ class MainActivity : Activity() {
                 try {
                     val data = JSONObject(raw)
                     when(data.getString("type")) {
-                        "ready" -> { pageReady = true; injectInsets(); theme(); handleIntent(intent) }
+                        "ready" -> { pageReady = true; injectInsets(); theme(); handleIntent(intent); updatesStatus(); AppUpdates.check(this@MainActivity) { updatesStatus() } }
+                        "updateStatus" -> updatesStatus()
+                        "checkUpdate" -> { AppUpdates.check(this@MainActivity, true) { updatesStatus() }; updatesStatus() }
+                        "downloadUpdate" -> { AppUpdates.download(this@MainActivity); updatesStatus(); message("已交给系统下载，完成后可在下载列表打开安装包") }
+                        "updateDownloads" -> startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS))
                         "history" -> { canGoBack = data.optBoolean("canGoBack"); updateGestureExclusion() }
                         "exit" -> finish()
                         "haptic" -> web.performHapticFeedback(when(data.optString("kind")) { "confirm" -> if(Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.CLOCK_TICK; "edge" -> if(Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS; "heavy" -> HapticFeedbackConstants.LONG_PRESS; else -> HapticFeedbackConstants.CLOCK_TICK })
                         "date" -> { val date = runCatching { LocalDate.parse(data.optString("value")) }.getOrDefault(LocalDate.now()); DatePickerDialog(this@MainActivity, { _, y, m, d -> send(JSONObject().put("type","date").put("value",LocalDate.of(y,m+1,d).toString())) }, date.year, date.monthValue-1,date.dayOfMonth).show() }
-                        "sync" -> { val settings=data.getJSONObject("settings"); getSharedPreferences("native", MODE_PRIVATE).edit().putString("schedule", data.getJSONObject("schedule").toString()).putString("settings", settings.toString()).putString("bookTitles", data.optJSONObject("bookTitles")?.toString() ?: "{}").apply(); ReminderScheduler.enqueue(this@MainActivity); if(!settings.optBoolean("notificationsEnabled",true)) Notifications.clearAll(this@MainActivity) else if(!settings.optBoolean("journeyLive",true)) Notifications.stopJourney(this@MainActivity) else Notifications.pet(this@MainActivity) }
+                        "sync" -> { val settings=data.getJSONObject("settings"); getSharedPreferences("native", MODE_PRIVATE).edit().putString("schedule", data.getJSONObject("schedule").toString()).putString("settings", settings.toString()).putString("bookTitles", data.optJSONObject("bookTitles")?.toString() ?: "{}").apply(); ReminderScheduler.enqueue(this@MainActivity); AppUpdates.schedule(this@MainActivity); AppUpdates.check(this@MainActivity) { updatesStatus() }; if(!settings.optBoolean("notificationsEnabled",true)) Notifications.clearAll(this@MainActivity) else if(!settings.optBoolean("journeyLive",true)) Notifications.stopJourney(this@MainActivity) else Notifications.pet(this@MainActivity) }
                         "bookCovers" -> getSharedPreferences("native", MODE_PRIVATE).edit().putString("bookCovers",data.optJSONObject("covers")?.toString() ?: "{}").apply()
                         "notificationPermission" -> notifyPermission()
                         "notificationStatus" -> { val nm = getSystemService(NotificationManager::class.java); message("通知${if(nm.areNotificationsEnabled())"已允许" else "未允许"}；提醒由系统调度，省电状态下可能延迟；${ReminderScheduler.status(this@MainActivity)}") }
@@ -342,9 +349,9 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleIntent(intent) }
     override fun onConfigurationChanged(newConfig: Configuration) { super.onConfigurationChanged(newConfig); theme() }
     private fun handleIntent(intent: Intent) { if(!pageReady) return; intent.getStringExtra("courseId")?.let { send(JSONObject().put("type",if(intent.getBooleanExtra("navigateCourse",false)) "navigateCourse" else "course").put("courseId",it)); intent.removeExtra("courseId"); intent.removeExtra("navigateCourse") }; if(intent.getBooleanExtra("poke",false)) { message("海豚收到啦，今天也一起加油！"); intent.removeExtra("poke") } }
-    override fun onResume() { super.onResume(); if(::web.isInitialized) web.onResume(); if(pageReady) { ReminderScheduler.enqueue(this); Notifications.pet(this) } }
+    override fun onResume() { super.onResume(); if(::web.isInitialized) web.onResume(); if(pageReady) { ReminderScheduler.enqueue(this); Notifications.pet(this); AppUpdates.schedule(this); AppUpdates.check(this) { updatesStatus() }; updatesStatus() } }
     override fun onPause() { if(::web.isInitialized) web.onPause(); super.onPause() }
-    override fun onDestroy() { fileCallback?.onReceiveValue(null); fileCallback = null; captureFile?.delete(); if(::web.isInitialized) { web.removeJavascriptInterface("Dolphin"); web.destroy() }; super.onDestroy() }
+    override fun onDestroy() { stopObservingUpdates?.invoke(); stopObservingUpdates = null; fileCallback?.onReceiveValue(null); fileCallback = null; captureFile?.delete(); if(::web.isInitialized) { web.removeJavascriptInterface("Dolphin"); web.destroy() }; super.onDestroy() }
 
     private inner class EdgeWebView : WebView(this@MainActivity) {
         private var tracking = false

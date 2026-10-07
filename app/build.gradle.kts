@@ -45,4 +45,4 @@ tasks.named("preBuild") { dependsOn(syncWeb) }
 tasks.matching { it.name == "validateSigningRelease" }.configureEach {
     doFirst { check(signingFile.exists()) { "正式升级包必须使用原有发行签名，请恢复 signing.local.properties 和原密钥。" } }
 }
-dependencies { implementation("androidx.webkit:webkit:1.12.1"); implementation("androidx.core:core-ktx:1.15.0") }
+dependencies { implementation("androidx.webkit:webkit:1.12.1"); implementation("androidx.core:core-ktx:1.15.0"); testImplementation("junit:junit:4.13.2") }

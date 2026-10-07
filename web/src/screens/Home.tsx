@@ -8,6 +8,7 @@ import {Icon} from '../components/Icon';
 import {haptic} from '../lib/native';
 import {holidayLookup} from '../lib/holidays';
 import '../theme/home-search-experience.css';
+import '../theme/updates.css';
 function timeBand(time:string){const hour=Number(time.split(':')[0]);return hour<12?'上午':hour<14?'中午':hour<18?'下午':'晚上';}
 function courseDateSuggestions(schedule:Schedule,selected:string){
   const base=monday(parseDate(schedule.term.startDate));let first:string|undefined,next:string|undefined;
@@ -17,8 +18,8 @@ function courseDateSuggestions(schedule:Schedule,selected:string){
   }
   return {first,next};
 }
-export function Home({openCourse,openImport,addCourse,navigate,visible}:{openCourse:(c:Course,el?:HTMLElement)=>void;openImport:()=>void;addCourse?:()=>void;navigate:(c:Course)=>void;visible:boolean}){
-  const {data}=useApp(),{schedule,settings}=data;
+export function Home({openCourse,openImport,addCourse,navigate,visible,openUpdates}:{openCourse:(c:Course,el?:HTMLElement)=>void;openImport:()=>void;addCourse?:()=>void;navigate:(c:Course)=>void;visible:boolean;openUpdates?:()=>void}){
+  const {data,appUpdates}=useApp(),{schedule,settings}=data;
   const holidays=useMemo(()=>holidayLookup(data),[data]),holidayFor=(key:string)=>holidays.get(key);
   const [selected,setSelected]=useState(dateKey(new Date())),[now,setNow]=useState(Date.now());
   const [calendarOpen,setCalendarOpen]=useState(false),touch=useRef({x:0,y:0});
@@ -47,7 +48,7 @@ export function Home({openCourse,openImport,addCourse,navigate,visible}:{openCou
   return <div className="home-inner">
     <header className="brand-row">
       <div className="brand-mark"><Icon name="dolphin" size={26}/><span>Dolphin<span className="brand-light"> Calendar</span></span></div>
-      <button className="icon-button header-action" aria-label="导入课表" onClick={openImport}><Icon name="add" size={23}/></button>
+      <div className="home-header-actions">{appUpdates.available&&openUpdates&&<button className="update-indicator" aria-label="有新版本，前往更新页面" title="发现新版本" onClick={openUpdates}><Icon name="download" size={22}/></button>}<button className="icon-button header-action" aria-label="导入课表" onClick={openImport}><Icon name="add" size={23}/></button></div>
     </header>
     <div className="greeting">
       <div><h1>{isToday?'今天':`${date.getMonth()+1}月${date.getDate()}日`}</h1><p className="greeting-line">{greetingLine}</p></div>
