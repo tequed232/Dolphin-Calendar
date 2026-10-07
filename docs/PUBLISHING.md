@@ -6,7 +6,7 @@
 
 运行 `npm ci`、`npm run build:pages` 和 `node scripts/check-pages.mjs`。发布目录为 `build/pages/`：`index.html` 包含编译后的应用与样式，`assets/` 保存本地图片，`sw.js` 提供离线缓存，`.nojekyll` 避免静态资源被 Jekyll 处理。Pages 能读取入口引用的资源，应发布整个目录；开发入口 `web/index.html` 需要构建后才能运行。
 
-`.github/workflows/pages.yml` 在 main 更新时构建、验证并生成 Pages 部署附件；该附件不是 Git 源码提交，普通验证工作流仍不上传构建附件。默认不会对尚未启用 Pages 的私有仓库执行部署。当前仓库 Settings → Pages 显示需要升级套餐或将仓库公开才能启用；仓库继续保持 Private，尚未上线。
+`.github/workflows/static.yml` 在 main 更新时构建、验证并生成 Pages 部署附件；该附件不是 Git 源码提交，普通验证工作流仍不上传构建附件。仓库现已由作者调整为公开状态，本轮沿用该状态并修正作者添加的静态发布工作流，部署完整构建目录，不发布整个源码目录。部署状态以 Actions 的实际结果为准。
 
 私有仓库获得 Pages 支持后，在 Settings → Pages 将 Source 设为 GitHub Actions，并将仓库 Actions 变量 `PAGES_ENABLED` 设为 `true`，再运行工作流。也可以在启用 Pages 后手动运行工作流。另建公开托管仓库或改变源码仓库公开性，需要作者明确选择。私有源码并不意味着 Pages 网站也私有，发布前应确认站点访问范围。参见 [GitHub Pages 官方说明](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages)。
 
