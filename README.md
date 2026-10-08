@@ -33,6 +33,8 @@ Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 Re
 
 正式 APK 使用 `com.dolphin.calendar`、原发行签名和递增版本码 **10404**。请直接覆盖安装，保留应用数据；网页与 APK 数据仍各自独立。下载见 [v1.4.4 Release](https://github.com/tequed232/Dolphin-Calendar/releases/tag/v1.4.4)，配置与文件级差异见 [发行对比记录](docs/RELEASE_1.4.4_AUDIT.md)，本轮验证见 [STATUS.md](docs/STATUS.md)。
 
+Release 和 Pages 已发布，线上附件、完整标签 CI 与页面核对结果见 [发布完成记录](docs/PUBLICATION_1.4.4.md)。
+
 运行 `node scripts/check-delivery-integrity.mjs` 可复核 123 个应用源码及资源文件与交付包一致；仅版本元数据允许改变。
 
 ## 功能概览
