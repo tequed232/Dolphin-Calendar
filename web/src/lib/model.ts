@@ -1,5 +1,6 @@
-export type Course = { id: string; name: string; teacher: string; room: string; day: number; start: number; end: number; weeks: number[]; color: string; notes: string };
-export type Period = { start: string; end: string; label?: string };
+export type Course = { id: string; name: string; teacher: string; room: string; day: number; start: number; end: number; weeks: number[]; color: string; notes: string; temporary?: boolean; specificDate?: string };
+export type RestTime = { label: string; start: string; end: string };
+export type Period = { start: string; end: string; label?: string; breakAfter?: RestTime };
 export type Schedule = { term: { name: string; startDate: string; weeks: number }; periods: Period[]; courses: Course[]; importNotes?: string[] };
 export type Book = { title: string; publisher: string; edition: string; cover?: string; text: string; source: 'manual' | 'camera' | 'album' | 'builtin' };
 export type BackgroundImage = {url:string;name:string;width:number;height:number;sourceWidth:number;sourceHeight:number};
@@ -8,7 +9,7 @@ export type HolidayDay = {date:string;kind:HolidayKind;title:string;source:strin
 export type HolidayCalendar = {id:string;displayName:string;isSuggested:boolean};
 export type HolidayRange = {from:string;to:string;calendarIds:string[]};
 export type Settings = {
-  autoUpdate:boolean; directDownload:boolean;
+  autoUpdate:boolean; directDownload:boolean; timetableMode?: 'list'|'grid'; showTimes?:boolean; showCurrentTimeLine?:boolean;
   mode: 'system' | 'light' | 'dark'; scale: number; showNavigation: boolean; showWeekend: boolean; firstDay: number; holidayMarkers:boolean;
   topAuto: boolean; bottomAuto: boolean; topInset: number; bottomInset: number;
   glass: boolean; glassMode:'off'|'partial'|'full'; dispersion: number; scattering: number; distortion: number; backgroundEnabled:boolean; backgroundBlur:number; performance: 'auto' | 'high';
@@ -25,8 +26,8 @@ export function parseDate(value: string) { const [y,m,d] = value.split('-').map(
 export function addDays(date: Date, days: number) { const next = new Date(date); next.setDate(next.getDate()+days); return next; }
 export function monday(date: Date) { return addDays(date, -((date.getDay()+6)%7)); }
 export function weekOf(date: Date, start: string) { const a = parseDate(dateKey(date)), b = monday(parseDate(start)); return Math.floor(Math.round((a.getTime()-b.getTime())/86400000)/7)+1; }
-export function coursesOn(schedule: Schedule, date: Date) { const w = weekOf(date,schedule.term.startDate); return schedule.courses.filter(c => c.day === ((date.getDay()+6)%7)+1 && c.weeks.includes(w)).sort((a,b)=>a.start-b.start); }
-export function courseDates(course: Course, schedule: Schedule) { const base = monday(parseDate(schedule.term.startDate)); return course.weeks.map(w=>dateKey(addDays(base,(w-1)*7+course.day-1))); }
+export function coursesOn(schedule: Schedule, date: Date) { const w = weekOf(date,schedule.term.startDate); return schedule.courses.filter(c => c.start>=1&&c.end<=schedule.periods.length&&(c.specificDate ? c.specificDate===dateKey(date) : c.day === ((date.getDay()+6)%7)+1 && c.weeks.includes(w))).sort((a,b)=>a.start-b.start); }
+export function courseDates(course: Course, schedule: Schedule) { if(course.specificDate)return [course.specificDate]; const base = monday(parseDate(schedule.term.startDate)); return course.weeks.map(w=>dateKey(addDays(base,(w-1)*7+course.day-1))); }
 export function compactWeeks(values: number[]) {
   const a = [...new Set(values)].sort((x,y)=>x-y), out: string[] = [];
   for(let i=0;i<a.length;i++) { let j=i; while(a[j+1]===a[j]+1) j++; out.push(j===i?`${a[i]}`:`${a[i]}-${a[j]}`); i=j; } return out.join(';');
@@ -35,7 +36,7 @@ export function coursePeriod(course:Course,schedule:Schedule){const first=schedu
 export function initialData(): AppData {
   const startDate = dateKey(monday(new Date()));
   return { schema: 1, appearanceRevision: 2, schedule: {term:{name:'我的新学期',startDate,weeks:20}, periods:DEFAULT_PERIODS,courses:[]},books:{},onboarded:false,holidays:[],holidayCalendarIds:[],holidaySourceNames:[],holidayRanges:[],
-    settings: {autoUpdate:true,directDownload:false,mode:'system',scale:1,showNavigation:true,showWeekend:true,firstDay:1,holidayMarkers:false,topAuto:true,bottomAuto:true,topInset:24,bottomInset:20,glass:true,glassMode:'partial',dispersion:1,scattering:1,distortion:1,backgroundEnabled:false,backgroundBlur:12,performance:'auto',notificationsEnabled:true,reminders:false,advance:10,journeyLive:true,pet:false,poke:true,lines:'下一站，知识的海洋。\n带好教材，我们出发吧！',school:'',map:'amap',dynamicColor:false} };
+    settings: {timetableMode:'list',showTimes:true,showCurrentTimeLine:true,autoUpdate:true,directDownload:false,mode:'system',scale:1,showNavigation:true,showWeekend:true,firstDay:1,holidayMarkers:false,topAuto:true,bottomAuto:true,topInset:24,bottomInset:20,glass:true,glassMode:'partial',dispersion:1,scattering:1,distortion:1,backgroundEnabled:false,backgroundBlur:12,performance:'auto',notificationsEnabled:true,reminders:false,advance:10,journeyLive:true,pet:false,poke:true,lines:'下一站，知识的海洋。\n带好教材，我们出发吧！',school:'',map:'amap',dynamicColor:false} };
 }
 export function sampleSchedule(): Schedule {
   const base=initialData().schedule;

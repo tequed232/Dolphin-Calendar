@@ -8,7 +8,7 @@
 
 Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 React 界面提供网页版和 Android 安装版：主页看课程，点击课程看教师、教室和教材，需要时再开启提醒、导航或系统日历。
 
-无需账号，没有业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。本文对应 **1.4.3 源码**，各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
+无需账号，没有自建业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。本文对应 **1.4.4 源码**，各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
 
 在线使用：[Dolphin Calendar 网页版](https://tequed232.github.io/Dolphin-Calendar/)。网页版发布运行 `npm run build:pages`，入口为 `build/pages/index.html`。该入口内置编译后的界面代码和样式，图片与离线缓存文件随整个目录发布，支持 `/Dolphin-Calendar/` 子路径。不要将开发用的 `web/index.html` 单独上传。发布工作流和 Pages 发布条件见 [发布说明](docs/PUBLISHING.md)。
 
@@ -16,18 +16,38 @@ Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 Re
 
 <p align="center">
   <img src="docs/images/onboarding.png" width="260" alt="首次启动：用三步介绍导入、查看与导航、提醒与外观" />
-  <img src="docs/images/home-demo.png" width="260" alt="主页示例：日期选择、下一节课、当日日程与固定底栏" />
+  <img src="docs/images/home-demo.png" width="260" alt="历史主页示例：日期选择、下一节课、当日日程与旧版三项底栏" />
 </p>
 
-*截图中的课程、教师和地点为演示数据。界面支持浅色、深色与跟随系统。*
+*截图中的课程、教师和地点为演示数据。主页图保留旧版三项底栏，供外观参考；1.4.4 使用下文的“列表 / 平铺 / 搜索 / 设置”四项底栏。界面支持浅色、深色与跟随系统。*
+
+## 1.4.4 变更与交付包对比
+
+本版从作者提供的 2026-10-08 交付包同步现有功能实现，并重新编译为可覆盖旧正式版的 APK；交付包自带的 1.4.3 调试 APK 不用于正式发行。对比基准是线上 1.4.3 的 `7f2a657`。本次不改写功能实现，只调整发行版本及文档、验证配置。
+
+- 底栏改为 **列表 / 平铺 / 搜索 / 设置**；列表与七天网格共用课表和阅读焦点，平铺支持长按移动及上下调整节次。
+- 文件导入支持 **JSON / CSV / XLS / XLSX**，依次识别、校验、预览和确认；兼容工作表选择、合并单元格、课程及逐节时间模板。
+- “课表管理”统一学期、每日节数、上下课时间、午休与课程；缺省导入配置保留当前值，临时课程可绑定实际日期。
+- 当前时间线默认开启，可在外观中关闭；平铺顶部玻璃浮窗下滑收起、上滑显示。
+- 网页增加正式 Release 的每日/手动检查与缓存；应用内 APK 下载继续仅在 Android 提供。
+
+正式 APK 使用 `com.dolphin.calendar`、原发行签名和递增版本码 **10404**。请直接覆盖安装，保留应用数据；网页与 APK 数据仍各自独立。下载见 [v1.4.4 Release](https://github.com/tequed232/Dolphin-Calendar/releases/tag/v1.4.4)，配置与文件级差异见 [发行对比记录](docs/RELEASE_1.4.4_AUDIT.md)，本轮验证见 [STATUS.md](docs/STATUS.md)。
+
+运行 `node scripts/check-delivery-integrity.mjs` 可复核 123 个应用源码及资源文件与交付包一致；仅版本元数据允许改变。
 
 ## 功能概览
 
-### 应用更新（Android）
+### 课表与导航
 
-设置 → 关于 → 应用更新可开启每日自动检查，也可立即检查。发现比当前更新的正式 Release 后，主页右上角显示黄色下载入口。自动检查默认开启，只检查版本；应用内下载为独立开关，默认关闭。开启后仍需手动下载，完成后到系统下载列表打开 APK，由系统确认安装。也可直接前往作者 GitHub Release 页面。
+设置中的“课表管理”和主页的同名入口打开同一页面，集中课程、学期、每日节数、上下课时间和导入；页面内的“课表设置”区域复用现有配置组件，导出与恢复集中到“数据与备份”。新安装默认进入列表，已有显示模式沿用保存值。平铺默认处于浏览状态，长按或“调整布局”进入单门课程布局编辑；点击空白、返回和切换页面/模式可退出。底栏固定为“列表 / 平铺 / 搜索 / 设置”，顶部不再重复切换。只有平铺显示顶部玻璃浮动框，材质沿用 Dock，下滑收起、上滑显示；列表使用普通页头。列表与平铺共享课程/日期/节次焦点，切换后保持阅读位置；二级任务隐藏底栏并保留返回位置。
 
-检查只访问作者仓库的公开发布信息，不上传课表、封面或背景。每日检查采用非精确调度，可能受省电影响；重启后重新打开 App 会恢复并补查。网页自身通过网站发布更新，不执行 APK 检查与下载。
+平铺课表、临时课程、统一 CSV/Excel 导入、动态节次及焦点切换的格式、迁移和验证说明见 [开发升级说明](docs/DEVELOPMENT_UPGRADE.md)；本轮问题、修改与验收映射见 [交互验收清单](docs/NAVIGATION_INTERACTION.md)。
+
+### 应用更新
+
+设置 → 应用更新可开启每日自动检查，也可立即检查。发现比当前更新的正式 Release 后，主页右上角显示黄色下载入口。自动检查默认开启，只检查版本；应用内下载为独立开关，默认关闭。开启后仍需手动下载，完成后到系统下载列表打开 APK，由系统确认安装。也可直接前往作者 GitHub Release 页面。
+
+检查只访问作者仓库的公开发布信息，不上传课表、封面或背景。Android 每日检查采用非精确调度，可能受省电影响；重启后重新打开 App 会恢复并补查。网页也支持手动检查；自动检查在网页打开期间执行，距上次成功检查满 24 小时后检查本仓库的正式 Release，缓存上次验证的结果并提供 Release 跳转。网页代码通过 Pages 发布更新，应用内 APK 下载仅限 Android。关闭自动检查后仍可手动检查；离线使用课表不要求版本检查成功。
 
 ### 实时通知与导航
 
@@ -49,15 +69,15 @@ Android 权限用于 **日历读写、系统通知及实时更新请求、版本
 
 ### 系统日历与节假日
 
-Android 安装版可以把实际上课日期写入独立的 Dolphin 课程日历。日程注明 **由 Dolphin Calendar 创建**，分别记录教师与规范教室位置；“复原”恢复上一次导入前的 Dolphin 课程日历状态。不会修改其他来源的系统日历。
+在“课表管理 → 导入到系统日历”中，Android 安装版可以把实际上课日期写入独立的 Dolphin 课程日历。日程注明 **由 Dolphin Calendar 创建**，分别记录教师与规范教室位置；“复原”恢复上一次导入前的 Dolphin 课程日历状态。不会修改其他来源的系统日历。
 
-在 **设置 → 主页 → 节假日标记** 开启功能、选择系统日历来源，再按年份读取。日期条和月历可显示 **休 / 补 / 节** 及不同颜色，**只加标记，不自动删课、调课或改变提醒**。如果 ROM 没有通过 Calendar Provider 公开节假日事项，应用无法读取它内部显示的假日数据。
+在 **设置 → 主页显示 → 节假日标记** 开启功能、选择系统日历来源，再按年份读取。日期条和月历可显示 **休 / 补 / 节** 及不同颜色，**只加标记，不自动删课、调课或改变提醒**。如果 ROM 没有通过 Calendar Provider 公开节假日事项，应用无法读取它内部显示的假日数据。
 
 ### 网页版与 APK 的区别
 
 | 能力 | 网页版 | Android APK |
 |---|---|---|
-| 课表、搜索、月历、JSON 导入导出 | 支持 | 支持 |
+| 列表/平铺课表、搜索、月历、JSON/CSV/Excel 导入及 JSON 导出 | 支持 | 支持 |
 | 教材信息、背景和外观设置 | 支持 | 支持 |
 | 封面选图 | 浏览器文件选择器 | 系统文件选择器 |
 | 相机采集封面 | 取决于浏览器和设备的 `capture` 支持 | 系统相机 + FileProvider，无需应用 CAMERA 权限 |
@@ -65,13 +85,14 @@ Android 安装版可以把实际上课日期写入独立的 Dolphin 课程日历
 | 应用关闭后的课前提醒 | 不支持 | 原生闹钟与广播调度 |
 | 系统持续通知与实时更新请求 | 不支持 | 支持，展示形态取决于系统 |
 | 系统日历导入、复原与假日读取 | 不支持 | 获准后使用 Calendar Provider |
+| 正式 Release 检查 | 手动及网页打开期间的每日检查；跳转 Release | 手动及系统每日调度；可选择应用内下载 |
 | 离线使用基础课表 | 可双击离线版；网站版首次缓存后可用 | 网页、图标与默认图片随 APK 内置 |
 
 网页、正式 APK 与调试 APK 的数据彼此独立，不会自动跨端同步。导出的 JSON 包含课表、学期和节次，**不包含教材封面、背景图片或全部偏好**。卸载应用、清除应用数据或浏览器站点数据会删除本地内容，请按需要导出课表。
 
 ## JSON 课表格式
 
-导入页面只接受 JSON 文本和 `.json` 文件。截图、教务网页与 HTML 请先在外部工具中转换为 JSON；导入页提供转换提示词和教程。应用不会自动把文件上传给第三方工具。
+主页和课表管理中的“导入课表”进入同一页面，选择文件后自动识别格式、校验、预览并确认；仅识别失败或扩展名与内容不符时需要指定格式。CSV 提供格式说明、课程示例和逐节时间模板，内容与解析器字段同源。JSON 和 CSV 提供的自定义上/下课时间会同步到内置课时，并自动识别午休行、独立 `lunchBreak` 及 `08:00–08:45` 时间段；午休显示在课间，不占课程节数。导入页提供 JSON / CSV 时间模板，预览列出识别结果；连堂课程只提供起止边界时保留中间时间，冲突或不完整时间会具体报错。粘贴入口接受 JSON；文件入口支持 `.json`、`.csv`、`.xlsx` 和 `.xls`，均先预览再确认替换。正常单工作表文件直接进入预览；返回修改保留文件及解析结果，预览确认按钮固定在底部。Excel 支持工作表选择、纵向合并单元格和简单行列映射。截图、教务网页与 HTML 请先在外部工具中转换为 JSON；导入页提供转换提示词和教程。应用不会自动把文件上传给第三方工具。
 
 以下是可直接导入的标准示例：
 
@@ -109,11 +130,11 @@ Android 安装版可以把实际上课日期写入独立的 Dolphin 课程日历
 | `courses[].teacher` / `notes` | 教师与备注；不确定的信息可以留空 |
 | `courses[].color` | 可选：`sage`、`lavender`、`peach`、`blue`、`rose` |
 
-没有提供 `periods` 时沿用当前节次表；新安装默认 12 节。需要自定义时可添加 `periods` 数组，例如 `[{"start":"08:00","end":"08:45"},{"start":"08:55","end":"09:40"}]`，课程节次不能超过数组长度。时间采用 24 小时制，同一节开始早于结束，节次之间不重叠；最多 24 个节次。
+未提供开学日期、学期周数或节次时间时保留当前设置；显式课程周次超出学期时扩展周数。没有提供 `periods` 时沿用当前节次表；新安装默认 12 节。需要自定义时可添加 `periods` 数组，例如 `[{"start":"08:00","end":"08:45"},{"start":"08:55","end":"09:40"}]`，课程节次不能超过数组长度。时间采用 24 小时制，同一节开始早于结束，节次之间不重叠；最多 24 个节次。
 
 ### 整学年与不完整数据
 
-未提供开学日期时，解析器优先使用学期名称中的年份，暂设 **9 月 1 日**，并要求在预览中核对。未提供总周数时，从实际课程周次推断；完全没有周次或学年长度时暂按 **52 周** 并提示核对。已提供总周数但课程包含更晚周次时，会扩展学期长度并在预览中提示。缺少周次的课程按最终学期长度每周上课处理，不会替用户猜单双周。
+未提供开学日期时保留当前开学日期，未提供总周数时保留当前周数；课程包含更晚周次时会扩展学期长度并在预览中提示。缺少周次的课程按最终学期长度每周上课处理，不会替用户猜单双周。
 
 支持一次导入整个学年，同时保留设备保护上限：
 
@@ -156,8 +177,10 @@ npm run preview
 安装 Android SDK Platform 36、Build Tools 和 Platform Tools，为项目创建自己的 `local.properties`：
 
 ```properties
-sdk.dir=C:/Users/你的用户名/AppData/Local/Android/Sdk
+sdk.dir=C\:/Users/你的用户名/AppData/Local/Android/Sdk
 ```
+
+Windows 路径推荐使用上述正斜杠写法；若使用反斜杠，须按 Java Properties 格式写成双反斜杠，避免 SDK 路径被错误解析。本机 SDK 路径不提交到仓库。
 
 把 `JAVA_HOME` 指向 JDK 17，然后构建：
 
@@ -182,7 +205,7 @@ macOS / Linux 使用 `./gradlew` 替换 `.\gradlew.bat`。Windows 也可以运�
 pwsh -File scripts/check-release.ps1 -PreviousApk "旧版正式 APK 的路径"
 ```
 
-公开身份与证书指纹保存在 [release-identity.json](release-identity.json)，不含私钥。校验脚本需要 Android SDK Build Tools **36.0.0**；可通过 `-SdkRoot` 指定 SDK 路径。`npm run deliver` 使用 Windows 交付脚本生成 APK、源码、网页、验证记录和 SHA-256 清单。
+公开身份与证书指纹保存在 [release-identity.json](release-identity.json)，不含私钥。校验脚本需要 Android SDK Build Tools **36.0.0**；可通过 `-SdkRoot` 指定 SDK 路径。`npm run deliver` 是 Windows 本地交付辅助脚本，需要先构建已签名的 release APK；它不执行 GitHub 发布。本次正式发行按 [发布说明](docs/PUBLISHING.md) 从对应发行 Git 提交归档源码，并单独核对本轮验证附件。
 
 ## 工程架构
 
@@ -239,12 +262,19 @@ legal/            第三方许可证全文
 npm run build
 npm run check
 npm test
+node scripts/check-delivery-integrity.mjs
 ```
 
 浏览器交互检查需要在另一个终端保持 `npm run dev` 运行：
 
 ```powershell
 npm run check:ui
+node scripts/check-current-time-line.mjs
+node scripts/check-toolbar-import.mjs
+node scripts/check-primary-navigation.mjs
+node scripts/check-file-times-ui.mjs
+node scripts/check-home-interaction.mjs
+node scripts/check-schedule-ui.mjs
 node scripts/check-onboarding.mjs
 node scripts/check-experience.mjs
 node scripts/check-home-search-experience.mjs
@@ -257,7 +287,9 @@ node scripts/check-master-glass.mjs
 node scripts/check-offline.mjs
 ```
 
-这些流程覆盖首次引导、草稿离开保护、空状态、搜索、导入取消与错误恢复、日期选择、背景、节假日、离线和持久化。结构守卫还会修改关键实现并确认检查能拒绝错误变体。测试优先使用本机已有 Chrome / Edge，可设置 `CHROME_PATH` 指定浏览器，或设置 `TEST_URL` 指向其他已启动的本地服务。
+这些流程覆盖首次引导、草稿离开保护、空状态、搜索、导入取消与错误恢复、日期选择、背景、节假日、离线和持久化。结构守卫还会修改关键实现并确认检查能拒绝错误变体。`npm run check` 包含源码准入、交付包一致性、工程及资产检查与两份 TypeScript 测试；单独执行一致性命令便于复核本次同步边界。测试优先使用本机已有 Chrome / Edge，可设置 `CHROME_PATH` 指定浏览器，或设置 `TEST_URL` 指向其他已启动的本地服务。
+
+`node scripts/ci.mjs` 会启动自己的开发服务并顺序运行 20 组浏览器检查，运行前停止已占用 5173 端口的服务。Pages 另执行 `npm run build:pages` 与 `node scripts/check-pages.mjs`，检查项目子路径、旧缓存升级、导入持久化和离线回退。网页默认自动检查版本，离线及 Pages 验证只允许访问本仓库官方 Release API；这项可选请求不传送课表数据。
 
 导入链路默认使用仓库内的合成旧格式数据，不依赖作者桌面的旧项目。需要额外核对旧版 `schedule.ts` 时，可显式设置 `LEGACY_SCHEDULE_PATH` 后运行 `check-import-ui.mjs`；真实课表样本不进入发布用源码。
 
@@ -269,9 +301,9 @@ node scripts/check-onboarding.mjs
 Remove-Item Env:TEST_OFFLINE
 ```
 
-Android 检查使用独立的调试包和专用模拟器；例如指定 `ANDROID_SERIAL=emulator-5554` 后运行 `check-background-device.mjs`、`check-holidays-device.mjs` 或 `check-calendar-device.mjs`。`check-android-interaction.mjs` 是 1.4.0 的历史设备流程，其中要求“完全”玻璃模式；**不适用于当前 1.4.1 稳定版**。请先阅读各脚本的备份、恢复与设备选择逻辑，勿将测试当作普通使用流程。结构化结果与截图写入 `build/evidence/`，Android lint 报告位于 `app/build/reports/`。
+Android 检查使用独立的调试包和专用模拟器；例如指定 `ANDROID_SERIAL=emulator-5554` 后运行 `check-background-device.mjs`、`check-holidays-device.mjs` 或 `check-calendar-device.mjs`。`check-android-interaction.mjs` 是 1.4.0 的历史设备流程，其中要求“完全”玻璃模式；**不适用于当前稳定版**。请先阅读各脚本的备份、恢复与设备选择逻辑，勿将测试当作普通使用流程。结构化结果与截图写入 `build/evidence/`，Android lint 报告位于 `app/build/reports/`。
 
-仓库提供 [GitHub Actions 验证工作流](.github/workflows/verify.yml)，执行网页构建、基础及浏览器检查、Android debug 构建和 lint；构建产物不提交到仓库，也不上传为工作流附件。某个版本是否通过、是否有对应实机证据，以 [STATUS.md](docs/STATUS.md) 及其记录为准。
+仓库提供 [GitHub Actions 验证工作流](.github/workflows/verify.yml)，执行网页构建、基础及浏览器检查、Android debug 构建、JVM 单元测试和 lint；构建产物不提交到仓库，也不上传为普通验证工作流附件。[Pages 工作流](.github/workflows/static.yml) 单独检查交付包源码一致性、构建并验证 `build/pages`，随后上传专用 Pages 部署附件。某个版本是否通过、是否有对应实机证据，以 [STATUS.md](docs/STATUS.md) 及其记录为准。
 
 ### 已知边界
 

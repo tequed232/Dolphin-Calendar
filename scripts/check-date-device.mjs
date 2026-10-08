@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -10,7 +11,7 @@ const page=await (await device.webView({pkg:'com.dolphin.calendar.debug'})).page
 const report={device:adb('shell','getprop','ro.product.model').trim(),directions:[]};
 try{
  const intro=page.getByRole('button',{name:'先逛一逛',exact:true});if(await intro.isVisible())await intro.click();
- await page.getByRole('button',{name:'首页',exact:true}).click();
+ await goTab(page,'列表');
  await page.locator('.screen.active').evaluate(el=>{el.scrollTop=0;});
  for(const direction of ['left','right']){
   await page.locator('.date-strip').evaluate((el,direction)=>{

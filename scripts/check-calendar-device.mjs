@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {writeFile,mkdir,readFile} from 'node:fs/promises';
@@ -32,7 +33,7 @@ async function state(value){return page.evaluate(value=>new Promise((resolve,rej
  if(value!==undefined){if(value===null)store.delete('app');else store.put(value,'app');tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);}
  else {const result=store.get('app');result.onsuccess=()=>{resolve(result.result??null);db.close();};result.onerror=()=>reject(result.error);}};request.onerror=()=>reject(request.error);
 }),value);}
-async function open(){await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="editor"]').click();await page.getByRole('button',{name:/导入到系统日历/}).click();}
+async function open(){await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.getByRole('button',{name:/导入到系统日历/}).click();}
 async function importCourse(){await page.getByRole('button',{name:'导入到系统日历',exact:true}).click();await page.getByRole('button',{name:'确认导入',exact:true}).click();}
 async function result(text){await page.locator('.calendar-result').filter({hasText:text}).waitFor({timeout:15000});}
 async function restore(){await page.getByRole('button',{name:'复原到导入前',exact:true}).click();await page.getByRole('button',{name:'确认复原',exact:true}).click();await result(/已撤销|已复原/);}

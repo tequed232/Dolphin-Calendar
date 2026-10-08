@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {launchBrowser} from './check-browser.mjs';
@@ -9,7 +10,7 @@ const checks=[],errors=[],visualEvidence=[];page.on('pageerror',error=>errors.pu
 await mkdir('build/evidence',{recursive:true});
 async function check(name,fn){await fn();checks.push(name);console.log('PASS '+name);}
 const screen=()=>page.locator('[data-screen="holidays"].active');
-async function settings(){await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="home-settings"]').click();await page.getByRole('button',{name:'节假日标记',exact:false}).click();await screen().waitFor();}
+async function settings(){await goTab(page,'设置');await page.locator('[data-setting="home-settings"]').click();await page.getByRole('button',{name:'节假日标记',exact:false}).click();await screen().waitFor();}
 async function mode(value){await page.evaluate(value=>{window.__holidayMode=value;},value);}
 async function state(){return page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('dolphin-calendar',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});return new Promise((resolve,reject)=>{const request=db.transaction('state').objectStore('state').get('app');request.onsuccess=()=>{db.close();resolve(request.result);};request.onerror=()=>reject(request.error);});});}
 async function waitSaved(predicate){
@@ -18,7 +19,7 @@ async function waitSaved(predicate){
   assert.fail('节假日保存状态未在 30 秒内满足条件');
 }
 async function refresh(){await screen().locator('[data-action="holiday-refresh"]').click();await page.waitForFunction(()=>!document.querySelector('[data-screen="holidays"].active [data-action="holiday-refresh"]').textContent.includes('正在'));await page.waitForTimeout(100);}
-async function home(){await page.getByRole('button',{name:'首页',exact:true}).click();}
+async function home(){await goTab(page,'列表');}
 async function selectSource(id){await screen().locator('[data-action="holiday-calendars"]').click();await screen().locator(`[data-calendar-id="${id}"]`).waitFor();for(const checkbox of await screen().locator('[data-calendar-id]').all()){await checkbox.setChecked(await checkbox.getAttribute('data-calendar-id')===id);}await screen().locator('[data-action="holiday-save-sources"]').click();await page.waitForTimeout(100);}
 async function evidenceScreenshot(name,dialog=false){
   const selector=dialog?'dialog[open]':'.screen.active',target=page.locator(selector);

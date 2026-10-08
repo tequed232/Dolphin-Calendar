@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {execFileSync,spawn} from 'node:child_process';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -13,7 +14,7 @@ try{
   const webview=await device.webView({pkg:'com.dolphin.calendar.debug'});const page=await webview.page();
   const intro=page.getByRole('button',{name:'先逛一逛',exact:true});if(await intro.isVisible())await intro.click();
   await page.locator('.dock>button').first().click();
-  await page.waitForFunction(()=>document.querySelector('.dock').dataset.dragging==='false'&&document.querySelector('.dock-droplet-rim').getBoundingClientRect().width<73&&document.querySelector('.screen.active')?.dataset.screen==='home');
+  await page.waitForFunction(()=>document.querySelector('.dock').dataset.dragging==='false'&&document.querySelector('.dock-droplet-rim').getBoundingClientRect().width<73&&document.querySelector('.screen.active')?.dataset.screen==='list');
   await mkdir('build/evidence',{recursive:true});await page.screenshot({path:`build/evidence/${evidencePrefix}-home-redesign.png`});
   const geometry=await page.evaluate(()=>{const r=document.querySelector('.dock').getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,dpr:devicePixelRatio};});
   const px=v=>Math.round(v*geometry.dpr),startX=px(geometry.x+geometry.width/6),endX=px(geometry.x+geometry.width*5/6),y=px(geometry.y+geometry.height/2);
@@ -39,7 +40,7 @@ try{
   await new Promise(resolve=>setTimeout(resolve,350));
   const frames=(await page.evaluate(()=>{window.__dockSampling=false;return window.__dockFrames;})).filter(v=>v>0).sort((a,b)=>a-b);
   adb('shell','input','tap',String(endX),String(y));await page.waitForFunction(()=>document.querySelector('.screen.active')?.dataset.screen==='settings');
-  adb('shell','input','tap',String(startX),String(y));await page.waitForFunction(()=>document.querySelector('.screen.active')?.dataset.screen==='home');
+  adb('shell','input','tap',String(startX),String(y));await page.waitForFunction(()=>document.querySelector('.screen.active')?.dataset.screen==='list');
   const report={device:adb('shell','getprop','ro.product.model').trim(),geometry,idle,held,during,after:{...after,samples:frames.length,median:frames[Math.floor(frames.length*.5)],p95:frames[Math.floor(frames.length*.95)],max:frames.at(-1)},tap:'设置 → 首页，ADB 实际点击成功',metric:'无截图手势的 WebView requestAnimationFrame 间隔；不是屏幕实际呈现帧'};
   await writeFile(`build/evidence/${evidencePrefix}-dock-results.json`,JSON.stringify(report,null,2));
   assert.equal(held.dragging,'true');assert.ok(held.scale>1.18,'前景没有放大');assert.ok(held.rim>idle.rim+15,'玻璃轮廓没有展开');assert.ok(Math.abs(held.sample-idle.sample)<1,'背景采样范围被缩放');

@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
@@ -37,7 +38,7 @@ try{
  await store(seeded);await page.reload();
  await until(()=>has(10),'开启桌宠后没有通知');
  assert.match(record(10),/测试台词[一二]/);pass('无行程时显示桌宠，台词为单句');
- await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="notifications"]').click();
+ await goTab(page,'设置');await page.locator('[data-setting="notifications"]').click();
  assert.equal(await page.locator('.lyrics-disclosure').getAttribute('aria-expanded'),'false');
  await page.getByRole('button',{name:'模拟导航课程并检查状态',exact:true}).click();
  await until(()=>has(11)&&!has(10),'模拟行程未取代桌宠');

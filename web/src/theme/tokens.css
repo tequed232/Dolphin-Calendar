@@ -23,7 +23,9 @@
   --safe-top: 0px;
   --safe-bottom: 0px;
   --keyboard-height: 0px;
-  --dock-band: calc(var(--safe-bottom) + 104px);
+  --dock-height: 76px;
+  --dock-offset: 12px;
+  --dock-band: calc(var(--safe-bottom) + var(--dock-height) + var(--dock-offset) + 16px);
   --motion-duration: 300ms;
   --ease: cubic-bezier(.2,.8,.2,1);
   --glass-tint: #f9ffff70;

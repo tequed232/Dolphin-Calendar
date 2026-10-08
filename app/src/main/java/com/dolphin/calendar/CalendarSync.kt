@@ -80,7 +80,7 @@ object CalendarSync {
         val courses = ReminderScheduler.occurrences(context, snapshot).filter { it.end > it.start }
         check(courses.isNotEmpty()) { "没有可写入的课程，请检查上课时间；系统日历未更改" }
         val source = snapshot.getJSONArray("courses")
-        val expected = (0 until source.length()).sumOf { source.getJSONObject(it).getJSONArray("weeks").length() }
+        val expected = (0 until source.length()).sumOf { source.getJSONObject(it).let { course -> if (course.optString("specificDate").isNotBlank()) 1 else course.getJSONArray("weeks").length() } }
         val all = calendars(context)
         val previous = all.filterValues { it }.keys.toList()
         val prefs = ReminderScheduler.preferences(context)

@@ -5,9 +5,9 @@ import {parseImport,normalizeSchedule,normalizeRoom,navigationPlace,parseDay,par
 const current=initialData().schedule;
 current.term={name:'测试学期',startDate:'2026-09-07',weeks:20};
 const course={name:'高等数学',day:'周一',start:1,end:2,weeks:[1,3,5,7],room:'A101'};
-test('扁平形状、围栏、schedule 包裹，缺日期时按九月一日',()=>{
+test('扁平形状、围栏、schedule 包裹，缺日期时保留用户配置',()=>{
   const result=parseImport('```json\n'+JSON.stringify({schedule:{courses:[course]}})+'\n```','auto',current);
-  assert.equal(result.courses[0].name,'高等数学');assert.equal(result.courses[0].day,1);assert.match(result.term.startDate,/-09-01$/);assert.equal(result.courses[0].end,2);
+  assert.equal(result.courses[0].name,'高等数学');assert.equal(result.courses[0].day,1);assert.equal(result.term.startDate,current.term.startDate);assert.equal(result.courses[0].end,2);
 });
 test('应用二维形状读取真正节次标签，兼容老版 termStart',()=>{
   const result=normalizeSchedule({term:'旧学期',termStart:'2026-09-01',periods:[{period:'第3-4节',days:[[],[{name:'程序设计',weeks:'1-10双'}]]}]},current);
@@ -36,7 +36,7 @@ test('第21周自动扩展，独立中午节次与明确开学日期保留',()=>
 });
 test('单周、双周、空周次按最终学期长度展开并明确告知',()=>{
  const r=normalizeSchedule({term:'2027-2028-1',lessons:[{...course,weeks:'1-22'},{...course,weeks:'单周'},{...course,weeks:''}]},current);
- assert.equal(r.term.startDate,'2027-09-01');assert.equal(r.term.weeks,22);assert.equal(r.courses[1].weeks.at(-1),21);assert.equal(r.courses[2].weeks.length,22);assert.match(r.importNotes.join(' '),/未填写周次/);
+ assert.equal(r.term.startDate,current.term.startDate);assert.equal(r.term.weeks,22);assert.equal(r.courses[1].weeks.at(-1),21);assert.equal(r.courses[2].weeks.length,22);assert.match(r.importNotes.join(' '),/未填写周次/);
 });
 test('整学年连续 56 周和 120 周可导入，大量课次被明确拦截',()=>{
  const long=normalizeSchedule({term:'2026-2027-1',courses:[{...course,weeks:'1-56'},{...course,day:2,weeks:'单周'}]},current);

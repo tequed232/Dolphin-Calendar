@@ -32,8 +32,9 @@ object ReminderScheduler {
         for(i in 0 until courses.length()) {
             val c = courses.getJSONObject(i)
             val weeks = c.getJSONArray("weeks")
-            for(j in 0 until weeks.length()) {
-                val day = first.plusDays((weeks.getInt(j)-1)*7L+c.getInt("day")-1)
+            val specificDate = c.optString("specificDate").takeIf { it.isNotBlank() }?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            val dates = if (specificDate != null) listOf(specificDate) else (0 until weeks.length()).map { first.plusDays((weeks.getInt(it)-1)*7L+c.getInt("day")-1) }
+            for(day in dates) {
                 // 中午等独立分组可能尚未填写时间；只跳过未定时课程，不影响其他提醒。
                 val startTime = runCatching { LocalTime.parse(periods.getJSONObject(c.getInt("start")-1).getString("start")) }.getOrNull() ?: continue
                 val endTime = runCatching { LocalTime.parse(periods.getJSONObject(c.getInt("end")-1).getString("end")) }.getOrNull() ?: continue

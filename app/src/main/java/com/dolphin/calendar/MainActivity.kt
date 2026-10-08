@@ -307,7 +307,7 @@ class MainActivity : Activity() {
                         }
                         "theme" -> theme()
                         "appearance" -> { val dark = if(data.optString("mode")=="system") resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES else data.optBoolean("dark"); WindowCompat.getInsetsController(window,web).apply { isAppearanceLightStatusBars = !dark; isAppearanceLightNavigationBars = !dark }; web.setBackgroundColor(if(dark) Color.BLACK else Color.rgb(247,247,247)) }
-                        "export" -> { exportText = data.getString("text"); startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/json").putExtra(Intent.EXTRA_TITLE, data.getString("name")), 101) }
+                        "export" -> { exportText = data.getString("text"); startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(if(data.optString("mime") == "text/csv") "text/csv" else "application/json").putExtra(Intent.EXTRA_TITLE, data.getString("name")), 101) }
                     }
                 } catch(e: Exception) { message("操作未完成：${e.localizedMessage}") }
             }

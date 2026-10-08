@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {launchBrowser} from './check-browser.mjs';
@@ -11,28 +12,15 @@ async function check(name,fn){await fn();results.push(name);console.log('PASS '+
 async function storedData(){return page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('dolphin-calendar',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});const value=await new Promise((resolve,reject)=>{const r=db.transaction('state').objectStore('state').get('app');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});db.close();return value;});}
 async function savedGlassMode(mode){
  await page.evaluate(async mode=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('dolphin-calendar',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});const tx=db.transaction('state','readwrite'),store=tx.objectStore('state');const value=await new Promise((resolve,reject)=>{const r=store.get('app');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});value.settings.glassMode=mode;value.settings.glass=mode!=='off';store.put(value,'app');await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();},mode);
- const saved=await storedData();await page.reload();await page.locator('.load-note').waitFor({state:'hidden'});await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="appearance"]').click();return saved;
+ const saved=await storedData();await page.reload();await page.locator('.load-note').waitFor({state:'hidden'});await goTab(page,'设置');await page.locator('[data-setting="appearance"]').click();return saved;
 }
 async function backdropPixels(){const png=(await page.screenshot()).toString('base64');return page.evaluate(async png=>{const image=new Image();image.src='data:image/png;base64,'+png;await image.decode();const canvas=document.createElement('canvas');canvas.width=8;canvas.height=580;const context=canvas.getContext('2d');context.drawImage(image,4,80,8,580,0,0,8,580);return Array.from(context.getImageData(0,0,8,580).data);},png);}
 try{
  await page.clock.setFixedTime(new Date(2026,8,29,9,0));
  await page.goto(URL);await page.getByRole('button',{name:'先逛一逛',exact:true}).click();
- await check('冷启动首页、常驻底栏、关闭引导不重开',async()=>{await page.waitForTimeout(350);assert.equal(await page.locator('dialog[open]').count(),0);assert.equal(await page.locator('.dock').count(),1);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'home');});
- await check('键盘仅避让输入区域，Dock 固定且关闭后恢复',async()=>{
-  await page.evaluate(()=>window.dolphinInsets(28,24,0,844));
-  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="editor"]').click();await page.locator('.screen.active .import-entry').click();
-  const dock=await page.locator('.dock').boundingBox();
-  await page.getByRole('textbox',{name:'课表内容',exact:true}).focus();
-  await page.evaluate(()=>window.dolphinInsets(28,24,320,844));await page.waitForTimeout(400);
-  const raised=await page.locator('.dock').boundingBox(),input=await page.getByRole('textbox',{name:'课表内容',exact:true}).boundingBox();
-  assert.ok(Math.abs(raised.y-dock.y)<.1,'Dock 不应随键盘移动');assert.ok(input.y<524&&input.y+input.height<=525,'输入框应完整显示在键盘上方');
-  assert.equal(await page.locator('.screen-host').evaluate(el=>el.getBoundingClientRect().height),524);
-  // 模拟旧版 Android 把 WebView 布局视口缩短，Dock 仍按完整原窗口定位。
-  await page.setViewportSize({width:390,height:524});assert.ok(Math.abs((await page.locator('.dock').boundingBox()).y-dock.y)<.1);
-  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>{document.activeElement.blur();window.dolphinInsets(28,24,0,844);});
-  assert.equal(await page.locator('.screen-host').evaluate(el=>el.getBoundingClientRect().height),844);
-  assert.ok(Math.abs((await page.locator('.dock').boundingBox()).y-dock.y)<.1);
-  await page.getByRole('button',{name:'首页',exact:true}).click();await page.evaluate(()=>{window.dolphinInsets(0,0);document.documentElement.style.removeProperty('--native-height');});
+ await check('冷启动首页、常驻底栏、关闭引导不重开',async()=>{await page.waitForTimeout(350);assert.equal(await page.locator('dialog[open]').count(),0);assert.equal(await page.locator('.dock').count(),1);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'list');});
+ await check('二级导入任务隐藏Dock，键盘只缩短可编辑视口并恢复',async()=>{
+  await page.evaluate(()=>window.dolphinInsets(28,24,0,844));await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.locator('.screen.active .import-entry').click();assert.equal(await page.locator('.dock').count(),0);await pasteJSON(page);await page.getByRole('textbox',{name:'课表内容',exact:true}).focus();await page.evaluate(()=>window.dolphinInsets(28,24,320,844));await page.waitForTimeout(400);const input=await page.getByRole('textbox',{name:'课表内容',exact:true}).boundingBox();assert.ok(input.y<524&&input.y+input.height<=525);assert.equal(await page.locator('.screen-host').evaluate(el=>el.getBoundingClientRect().height),524);await page.setViewportSize({width:390,height:524});assert.equal(await page.locator('.dock').count(),0);await page.setViewportSize({width:390,height:844});await page.evaluate(()=>{document.activeElement.blur();window.dolphinInsets(28,24,0,844);});await goTab(page,'列表');await page.evaluate(()=>{window.dolphinInsets(0,0);document.documentElement.style.removeProperty('--native-height');});assert.equal(await page.locator('.dock').count(),1);
  });
  await check('日期条持续双向滚动并点选，背景固定在视口',async()=>{
   const first=await page.locator('.date-item').first().getAttribute('aria-label');
@@ -45,14 +33,14 @@ try{
   assert.ok(picked);assert.equal(await page.locator('.date-item.selected').getAttribute('aria-label'),picked);
   for(let i=0;i<4;i++){await page.locator('.date-strip').evaluate(el=>{el.scrollLeft=0;});await page.waitForTimeout(350);}
   assert.notEqual(await page.locator('.date-item').first().getAttribute('aria-label'),farRight);
-  await page.locator('.week-controls').getByRole('button',{name:'回到今天',exact:true}).click();
+  await page.getByRole('button',{name:'回到今天',exact:true}).click();
  });
  await check('新版材质主题与旧数据的外观迁移',async()=>{
   const palette=await page.evaluate(()=>({canvas:getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim(),ink:getComputedStyle(document.documentElement).getPropertyValue('--ink').trim(),accent:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()}));
   assert.deepEqual(palette,{canvas:'#f5f6f7',ink:'#182c2d',accent:'#007f89'});
   await page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('dolphin-calendar',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});const tx=db.transaction('state','readwrite'),store=tx.objectStore('state');const value=await new Promise((resolve,reject)=>{const r=store.get('app');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});delete value.appearanceRevision;value.settings.dynamicColor=true;store.put(value,'app');await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();});
   await page.reload();await page.waitForFunction(()=>document.documentElement.dataset.dynamic==='false');
-  assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'home');
+  assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'list');
  });
  await check('Dock 前景放大突出，背景采样尺寸保持稳定',async()=>{
   const button=page.locator('.dock>button').first(),label=button.locator('.dock-content'),rim=page.locator('.dock-droplet-rim');
@@ -74,28 +62,28 @@ try{
   assert.equal(await page.locator('.dock').getAttribute('data-dragging'),'true');
   assert.equal(await page.locator('.dock-tether').count(),0);
   assert.equal(await page.locator('.dock>button').first().evaluate(e=>getComputedStyle(e).opacity),'1');
-  assert.equal(await page.locator('.dock').getAttribute('data-preview'),'2');
+  assert.equal(await page.locator('.dock').getAttribute('data-preview'),'3');
   assert.doesNotMatch(await page.locator('.dock-droplet').evaluate(e=>e.style.transform),/scale\(/,'背景不得跟随液滴轮廓缩放');
   const bounds=await page.locator('.dock-droplet').boundingBox();assert.ok(bounds);
   assert.ok(bounds.x>=box.x-1&&bounds.x+bounds.width<=box.x+box.width+1&&bounds.y>=box.y-1&&bounds.y+bounds.height<=box.y+box.height+1,'液滴不能离开 Dock');
   await page.mouse.up();await page.waitForTimeout(350);
   assert.equal(await page.locator('.dock').getAttribute('data-dragging'),'false');
   assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'settings');
-  await page.getByRole('button',{name:'首页',exact:true}).click();
+  await goTab(page,'列表');
  });
  await check('点按标签时液滴从旧位置弹性滑到新位置',async()=>{
   await page.waitForTimeout(450);
   const read=()=>page.locator('.dock-droplet').evaluate(element=>Number(new DOMMatrix(getComputedStyle(element).transform).m41));
   const from=await read();
-  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await page.locator('.dock').getByRole('button',{name:'设置',exact:true}).click();
   const during=await read();
   await page.waitForTimeout(550);
   const to=await read();
   assert.ok(to-from>100&&during<to-8,`点击应有可见的位移过程：${from}, ${during}, ${to}`);
-  await page.getByRole('button',{name:'首页',exact:true}).click();await page.waitForTimeout(450);
+  await goTab(page,'列表');await page.waitForTimeout(450);
  });
- await page.getByRole('button',{name:'设置',exact:true}).click();
- await check('设置分组与入口顺序',async()=>{assert.deepEqual(await page.locator('.screen.active .setting-entry strong').allTextContents(),['主页','课表编辑','外观','实时通知','导航与学校','关于']);assert.deepEqual(await page.locator('.settings-group h2').allTextContents(),['课程与日常','偏好设置','应用']);});
+ await goTab(page,'设置');
+ await check('设置分组与入口顺序',async()=>{assert.deepEqual(await page.locator('.screen.active .setting-entry strong').allTextContents(),['主页显示','课表管理','外观','实时通知','导航与学校','应用更新','数据与备份','关于']);assert.equal(await page.locator('.screen.active [data-setting=editor]').count(),1);});
  await check('通知三段流程与导航状态开关持久化',async()=>{
   await page.locator('[data-setting="notifications"]').click();
   assert.deepEqual(await page.locator('.screen.active .subheading').allTextContents(),['课前提醒','导航中的实时状态','通知栏小伙伴']);
@@ -107,24 +95,24 @@ try{
   await page.locator('.lyrics-disclosure').click();assert.equal(await page.locator('.lyric-row').count(),0);
   assert.equal(await page.locator('#journey-live').isChecked(),true);
   await page.locator('#journey-live').click();await page.waitForFunction(()=>!document.querySelector('#journey-live').checked);
-  await page.reload();await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="notifications"]').click();
+  await page.reload();await goTab(page,'设置');await page.locator('[data-setting="notifications"]').click();
   assert.equal(await page.locator('#journey-live').isChecked(),false);
   await page.locator('#journey-live').click();await page.waitForFunction(()=>document.querySelector('#journey-live').checked);
-  await page.reload();await page.getByRole('button',{name:'设置',exact:true}).click();
+  await page.reload();await goTab(page,'设置');
  });
- await page.locator('[data-setting="editor"]').click();await page.locator('.screen.active .import-entry').click();
- await check('JSON 粘贴优先、文件导入为小按钮',async()=>{
-  const paste=await page.locator('.screen.active textarea[aria-label="课表内容"]').boundingBox();
+ await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.locator('.screen.active .import-entry').click();
+ await check('文件入口优先、JSON粘贴作为折叠备选',async()=>{
+  await pasteJSON(page);const paste=await page.locator('.screen.active textarea[aria-label="课表内容"]').boundingBox();
   const file=await page.locator('.screen.active .import-file-button').boundingBox();
-  assert.ok(paste&&file&&paste.y<file.y,'粘贴内容应先于文件入口');
+  assert.ok(paste&&file&&file.y<paste.y,'文件入口应先于粘贴内容');
   assert.ok(file.width<190,'文件入口应收成小按钮');
   await page.waitForTimeout(350);await page.screenshot({path:'build/evidence/import-redesign.png'});
  });
  await page.getByRole('button',{name:'解析并预览',exact:true}).click();await page.getByRole('button',{name:'知道了',exact:true}).click();
  const schedule={term:{name:'验证学期',startDate:'2026-09-28',weeks:20},courses:[{name:'数据结构',teacher:'陈老师',room:'16-203/202',day:2,start:3,end:4,weeks:[1,2,3,4],color:'sage'},{name:'未来课程',teacher:'李老师',room:'图书楼 A302',day:2,start:5,end:6,weeks:[16,17,18,19,20],color:'blue'}]};
- await page.getByRole('textbox',{name:'课表内容',exact:true}).fill(JSON.stringify(schedule));await page.getByRole('button',{name:'解析并预览',exact:true}).click();
- assert.equal(await page.getByPlaceholder('例如：某某大学某某校区').isVisible(),true);
- await page.getByRole('button',{name:'确认导入',exact:true}).click();
+ await pasteJSON(page);await page.getByRole('textbox',{name:'课表内容',exact:true}).fill(JSON.stringify(schedule));await page.getByRole('button',{name:'解析并预览',exact:true}).click();
+ assert.equal(await page.getByPlaceholder('例如：某某大学某某校区').count(),0);
+ await page.getByRole('button',{name:'确认导入',exact:true}).click();await goTab(page,'列表');
  await check('JSON 导入规范楼栋与 IndexedDB 刷新持久化',async()=>{await page.locator('.screen.active .course-card').first().waitFor();assert.match(await page.locator('.screen.active .course-card').first().innerText(),/数据结构/);assert.match(await page.locator('.screen.active .course-card').first().innerText(),/16栋203号教室/);await page.reload();await page.locator('.screen.active .course-card').first().waitFor();assert.match(await page.locator('.screen.active').innerText(),/验证学期/);});
  await check('整学年课程在主页可见且标明实际周次',async()=>{assert.equal(await page.locator('.screen.active .course-card').count(),2);await page.locator('.other-week-disclosure summary').click();assert.match(await page.locator('.screen.active .course-card.other-week').innerText(),/未来课程/);assert.match(await page.locator('.screen.active .course-card.other-week').innerText(),/第 16-20 周/);assert.match(await page.locator('.screen.active .section-heading').innerText(),/1 门课程/);});
  await check('主页快捷按钮固定在滚动层外',async()=>{
@@ -137,7 +125,7 @@ try{
   for(const button of [page.getByRole('button',{name:'导航课程',exact:true})]){
    assert.equal(await button.innerText(),'');const bounds=await button.boundingBox();assert.equal(Math.round(bounds.width),52);assert.equal(Math.round(bounds.height),52);assert.equal(await button.locator('svg').count(),1);
   }
-  assert.equal(await page.locator('.today-fab').count(),0);assert.equal(await page.locator('.week-controls').getByRole('button',{name:'回到今天',exact:true}).count(),1);assert.equal(await nav.locator('[data-icon]').getAttribute('data-icon'),'navigate');
+  assert.equal(await page.locator('.today-fab').count(),0);assert.equal(await page.getByRole('button',{name:'回到今天',exact:true}).count(),1);assert.equal(await nav.locator('[data-icon]').getAttribute('data-icon'),'navigate');
   await page.locator('.screen.active').evaluate(el=>{el.scrollTop=0;});
   await page.screenshot({path:`build/evidence/${version}-home-actions.png`});
  });
@@ -146,9 +134,9 @@ try{
   assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'navigation');
  });
  await check('地图只搜索学校和楼栋，教室号留在课程中',async()=>{
-  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="navigation"]').click();
+  await goTab(page,'设置');await page.locator('[data-setting="navigation"]').click();
   await page.getByPlaceholder('例如：浙江大学紫金港校区').fill('验证大学');
-  await page.getByRole('button',{name:'首页',exact:true}).click();await page.locator('.screen.active .course-card').first().click();
+  await goTab(page,'列表');await page.locator('.screen.active .course-card').first().click();
   await page.evaluate(()=>{window.open=(url)=>{window.__mapUrl=String(url);return null;};});
   await page.getByRole('button',{name:'导航至16栋'}).click();
   const url=await page.evaluate(()=>decodeURIComponent(window.__mapUrl??''));
@@ -168,9 +156,9 @@ try{
  await check('对话框用户关闭后不自行重开、可以再次打开',async()=>{await page.getByRole('button',{name:'编辑教材',exact:true}).click();await page.getByRole('button',{name:'取消',exact:true}).click();await page.waitForTimeout(500);assert.equal(await page.locator('dialog[open]').count(),0);await page.getByRole('button',{name:'编辑教材',exact:true}).click();assert.equal(await page.locator('dialog[open]').count(),1);await page.getByRole('button',{name:'取消',exact:true}).click();});
  await page.getByRole('button',{name:'关闭课程详情',exact:true}).click();
  await page.screenshot({path:'build/evidence/home-390.png'});
- await check('搜索匹配高亮与直达详情',async()=>{await page.getByRole('button',{name:'搜索',exact:true}).click();await page.getByRole('searchbox',{name:'搜索课程',exact:true}).fill('陈老师');assert.equal(await page.locator('.screen.active mark').innerText(),'陈老师');await page.locator('.screen.active .result-card').click();assert.match(await page.locator('.course-sheet h1').innerText(),/数据结构/);await page.getByRole('button',{name:'关闭课程详情',exact:true}).click();});
- await check('标签切换不闪过主页，底栏只有一份',async()=>{await page.getByRole('button',{name:'设置',exact:true}).click();assert.equal(await page.locator('[data-screen=home]').evaluate(e=>getComputedStyle(e).visibility),'hidden');await page.getByRole('button',{name:'搜索',exact:true}).click();assert.equal(await page.locator('[data-screen=home]').evaluate(e=>getComputedStyle(e).visibility),'hidden');assert.equal(await page.locator('.dock').count(),1);});
- await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="appearance"]').click();
+ await check('搜索匹配高亮与直达详情',async()=>{await goTab(page,'搜索');await page.getByRole('searchbox',{name:'搜索课程',exact:true}).fill('陈老师');assert.equal(await page.locator('.screen.active mark').innerText(),'陈老师');await page.locator('.screen.active .result-card').click();assert.match(await page.locator('.course-sheet h1').innerText(),/数据结构/);await page.getByRole('button',{name:'关闭课程详情',exact:true}).click();});
+ await check('标签切换不闪过主页，底栏只有一份',async()=>{await goTab(page,'设置');assert.equal(await page.locator('[data-screen=list]').evaluate(e=>getComputedStyle(e).visibility),'hidden');await goTab(page,'搜索');assert.equal(await page.locator('[data-screen=list]').evaluate(e=>getComputedStyle(e).visibility),'hidden');assert.equal(await page.locator('.dock').count(),1);});
+ await goTab(page,'设置');await page.locator('[data-setting="appearance"]').click();
  await check('圆角选择菜单与系统深浅模式实时切换',async()=>{
   const trigger=page.getByRole('button',{name:'深浅模式',exact:true});
   assert.equal(await trigger.evaluate(element=>getComputedStyle(element).borderRadius),'15px');
@@ -183,18 +171,11 @@ try{
   await page.waitForFunction(()=>document.documentElement.dataset.mode==='light');
   await page.screenshot({path:'build/evidence/appearance-custom-controls.png'});
  });
- await check('稳定版隐藏玻璃三档选择，旧偏好保留且仅底栏使用透镜',async()=>{
-  await page.locator('.dock[data-droplet-ready=true]').waitFor();
-  assert.match(await page.locator('#glass-droplet feImage').first().getAttribute('href'),/^data:image\/png/);
-  assert.equal(await page.locator('.dock').evaluate(e=>getComputedStyle(e,'::before').backdropFilter.includes('glass-refraction')),false);
-  assert.equal(await page.getByRole('button',{name:'液态玻璃模式',exact:true}).count(),0);assert.equal(await page.locator('.glass-mode-description').count(),0);
-  const full=await savedGlassMode('full');await page.waitForFunction(()=>document.documentElement.dataset.glassMode==='partial');
-  assert.equal(await page.locator('.screen.active md-card').first().evaluate(e=>getComputedStyle(e).backdropFilter),'none');assert.deepEqual(await storedData(),full);
-  assert.equal(await page.getByRole('button',{name:'底栏边缘光泽',exact:true}).isVisible(),true);
-  const off=await savedGlassMode('off');await page.waitForFunction(()=>document.documentElement.dataset.glassMode==='off');
-  assert.equal(await page.locator('.dock').evaluate(e=>getComputedStyle(e,'::before').backdropFilter),'none');
-  assert.equal(await page.getByRole('button',{name:'液态玻璃模式',exact:true}).count(),0);assert.deepEqual(await storedData(),off);
-  const partial=await savedGlassMode('partial');await page.waitForFunction(()=>document.documentElement.dataset.glassMode==='partial');await page.locator('.dock[data-droplet-ready=true]').waitFor();assert.deepEqual(await storedData(),partial);
+ await check('稳定版隐藏玻璃模式，任务页无Dock，一级页仍保留可降级透镜',async()=>{
+  assert.equal(await page.locator('.dock').count(),0);assert.equal(await page.getByRole('button',{name:'液态玻璃模式',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'底栏边缘光泽',exact:true}).isVisible(),true);await goTab(page,'列表');await page.locator('.dock[data-droplet-ready=true]').waitFor();assert.match(await page.locator('#glass-droplet feImage').first().getAttribute('href'),/^data:image\/png/);assert.equal(await page.locator('.dock').evaluate(e=>getComputedStyle(e,'::before').backdropFilter.includes('glass-refraction')),false);
+  const full=await savedGlassMode('full');await page.waitForFunction(()=>document.documentElement.dataset.glassMode==='partial');assert.equal(await page.locator('.screen.active md-card').first().evaluate(e=>getComputedStyle(e).backdropFilter),'none');assert.deepEqual(await storedData(),full);await goTab(page,'列表');await page.locator('.dock[data-droplet-ready=true]').waitFor();
+  const off=await savedGlassMode('off');await page.waitForFunction(()=>document.documentElement.dataset.glassMode==='off');assert.deepEqual(await storedData(),off);await goTab(page,'列表');assert.equal(await page.locator('.dock').evaluate(e=>getComputedStyle(e,'::before').backdropFilter),'none');
+  const partial=await savedGlassMode('partial');await page.waitForFunction(()=>document.documentElement.dataset.glassMode==='partial');assert.deepEqual(await storedData(),partial);await goTab(page,'列表');await page.locator('.dock[data-droplet-ready=true]').waitFor();await goTab(page,'设置');await page.locator('[data-setting="appearance"]').click();
  });
  await check('不同触发高度与右边缘的返回收拢位置',async()=>{
   await page.waitForTimeout(350);
@@ -207,25 +188,25 @@ try{
  });
  await check('同步返回进度、降级玻璃、取消与提交只退一层',async()=>{
   await page.evaluate(()=>{window.dolphinBack('start');window.dolphinBack('progress',.6);});
-  assert.equal(await page.locator('html').evaluate(e=>e.style.getPropertyValue('--back-progress')),'0.6');assert.equal(await page.locator('.dock').evaluate(e=>getComputedStyle(e).backdropFilter),'none');
+  assert.equal(await page.locator('html').evaluate(e=>e.style.getPropertyValue('--back-progress')),'0.6');assert.equal(await page.locator('.dock').count(),0);
   await page.evaluate(()=>window.dolphinBack('cancel'));await page.waitForTimeout(250);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'appearance');
-  await page.evaluate(()=>{window.dolphinBack('start');window.dolphinBack('progress',1);window.dolphinBack('commit');});await page.waitForTimeout(250);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'settings');assert.equal(await page.locator('.sub-screen').count(),0);
+  await page.evaluate(()=>{window.dolphinBack('start');window.dolphinBack('progress',1);window.dolphinBack('commit');});await page.waitForTimeout(250);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'settings');assert.equal(await page.locator('.sub-screen').count(),0);assert.equal(await page.locator('.dock').count(),1);
  });
- await check('仅 JSON 可通过文本框与文件导入',async()=>{
-   await page.locator('[data-setting="editor"]').click();await page.locator('.screen.active .import-entry').click();
+ await check('文本入口保留 JSON 校验，文件入口支持 JSON/CSV/Excel',async()=>{
+   await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.locator('.screen.active .import-entry').click();
    const html='<table><tr><th>课程名</th></tr><tr><td>线性代数</td></tr></table><script>window.injected=true</script>';
-   await page.getByRole('textbox',{name:'课表内容'}).fill(html);await page.getByRole('button',{name:'解析并预览',exact:true}).click();
+   await pasteJSON(page);await page.getByRole('textbox',{name:'课表内容'}).fill(html);await page.getByRole('button',{name:'解析并预览',exact:true}).click();
    assert.match(await page.getByRole('alert').innerText(),/有效的 JSON/);await page.getByRole('button',{name:'知道了'}).click();
    await page.locator('.screen.active input[type=file]').setInputFiles({name:'schedule.html',mimeType:'text/html',buffer:Buffer.from(html)});
-   assert.match(await page.getByRole('alert').innerText(),/只支持 \.json/);await page.getByRole('button',{name:'知道了'}).click();
+   assert.match(await page.getByRole('alert').innerText(),/无法自动识别.*支持 JSON/s);await page.getByRole('dialog',{name:'读取课表'}).getByRole('button',{name:'取消',exact:true}).click();
    const json=JSON.stringify({courses:[{name:'线性代数',day:2,start:1,end:2,weeks:[1,2],room:'3-402/202'}]});
    await page.locator('.screen.active input[type=file]').setInputFiles({name:'schedule.json',mimeType:'application/json',buffer:Buffer.from(json)});
-   await page.getByRole('button',{name:'确认导入',exact:true}).click();await page.locator('.screen.active .other-week-disclosure summary').click();await page.locator('.screen.active .course-card').waitFor();
+   await page.getByRole('button',{name:'确认导入',exact:true}).click();await goTab(page,'列表');await page.locator('[data-screen=list].active').waitFor();if(await page.locator('.screen.active .other-week-disclosure summary').count())await page.locator('.screen.active .other-week-disclosure summary').click();await page.locator('.screen.active .course-card').waitFor();
    assert.match(await page.locator('.screen.active .course-card').first().innerText(),/3栋402号教室/);assert.equal(await page.evaluate(()=>window.injected),undefined);
  });
  await check('系统日历导入结果、创建说明与复原操作',async()=>{
    await page.evaluate(()=>{window.__calendarBridge=window.Dolphin;window.__calendarCommands=[];window.Dolphin={postMessage:raw=>window.__calendarCommands.push(JSON.parse(raw))};});
-   await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="editor"]').click();await page.getByRole('button',{name:/导入到系统日历/}).click();
+   await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.getByRole('button',{name:/导入到系统日历/}).click();
    await page.evaluate(()=>window.dolphinNative({type:'calendarResult',action:'calendarStatus',success:true,permission:true,count:3,canRestore:true,busy:false}));
    assert.match(await page.locator('.calendar-summary').innerText(),/由 Dolphin Calendar 创建/);
    await page.getByRole('button',{name:'导入到系统日历',exact:true}).click();await page.getByRole('button',{name:'确认导入',exact:true}).click();
@@ -238,7 +219,7 @@ try{
    await page.evaluate(()=>window.dolphinNative({type:'calendarResult',action:'calendarRestore',success:true,message:'已复原到导入前',permission:true,count:3,canRestore:false}));
    assert.equal(await page.getByRole('button',{name:'复原到导入前',exact:true}).isDisabled(),true);
    await page.screenshot({path:`build/evidence/${version}-calendar-browser.png`});
-   await page.getByRole('button',{name:'首页',exact:true}).click();await page.evaluate(()=>{if(window.__calendarBridge)window.Dolphin=window.__calendarBridge;else delete window.Dolphin;});
+   await goTab(page,'列表');await page.evaluate(()=>{if(window.__calendarBridge)window.Dolphin=window.__calendarBridge;else delete window.Dolphin;});
  });
  await check('窄屏与横屏布局、教材按钮换行不越界',async()=>{
    for(const [width,height] of [[308,720],[360,900],[390,844],[740,360]]){

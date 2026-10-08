@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {launchBrowser} from './check-browser.mjs';
@@ -49,7 +50,7 @@ try{
   // Deliberately remove clipping: the pixel test must catch the old rectangular surface.
   await page.locator('.dock-droplet-window').evaluate(e=>e.style.maskImage='none');const broken=await spill();assert.ok(broken.outside>80,'pixel guard must reject missing round clipping');await page.locator('.dock-droplet-window').evaluate(e=>e.style.removeProperty('mask-image'));
   await style.evaluate(e=>e.remove());await page.evaluate(()=>document.getElementById('pixel-grid').remove());
-  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="appearance"]').click();await page.waitForTimeout(350);
+  await goTab(page,'设置');await page.locator('[data-setting="appearance"]').click();await page.waitForTimeout(350);
   assert.equal(await page.locator('#contour-background').count(),0);
   assert.equal(await page.locator('.app-background').evaluate(e=>getComputedStyle(e).position),'absolute');
   // Freeze the compositor animation at 95%: the screen should already be almost transparent.
@@ -62,20 +63,20 @@ try{
   await page.evaluate(()=>document.querySelector('.screen.active').getAnimations()[0].finish());await page.waitForTimeout(100);
   assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'settings');assert.equal(await page.locator('html').evaluate(e=>e.classList.contains('gesturing')),false);
   // Popping a nested route must not replay the parent's slide-in animation.
-  await page.locator('[data-setting="editor"]').click();await page.locator('.screen.active .import-entry').click();await page.waitForTimeout(400);
+  await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.locator('.screen.active .import-entry').click();await page.waitForTimeout(400);
   await page.getByRole('button',{name:'返回上一页',exact:true}).click();await page.waitForTimeout(240);
   assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'editor');
   assert.equal(await page.locator('.screen.active').evaluate(e=>getComputedStyle(e).animationName),'none');
-  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await goTab(page,'设置');
   await page.locator('[data-setting="appearance"]').click();await page.waitForTimeout(400);
   await page.evaluate(()=>{window.dolphinBack('start');window.dolphinBack('progress',.4);window.dolphinBack('commit');window.dolphinBack('commit');});
-  await page.getByRole('button',{name:'首页',exact:true}).click();await page.waitForTimeout(400);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'home');
+  await goTab(page,'列表');await page.waitForTimeout(400);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'list');
   await page.screenshot({path:`build/evidence/${version}-home-light.png`});
-  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="appearance"]').click();await page.waitForTimeout(350);
+  await goTab(page,'设置');await page.locator('[data-setting="appearance"]').click();await page.waitForTimeout(350);
   await page.screenshot({path:`build/evidence/${version}-appearance.png`});
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.evaluate(()=>window.dolphinBack('back'));await page.waitForTimeout(100);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'settings');
-  await page.getByRole('button',{name:'首页',exact:true}).click();await page.locator('html').evaluate(e=>e.dataset.mode='dark');await page.screenshot({path:`build/evidence/${version}-home-dark.png`});
+  await goTab(page,'列表');await page.locator('html').evaluate(e=>e.dataset.mode='dark');await page.screenshot({path:`build/evidence/${version}-home-dark.png`});
   await writeFile(`build/evidence/${version}-visual-results.json`,JSON.stringify({version,capsule:results,unclippedMutation:broken,fade,fixedBackground:true,interruptedBackSafe:true,reducedMotion:true},null,2));
   console.log('PASS rounded backdrop pixels in light/dark, unclipped mutation rejected, continuous fade, interruption, reduced motion, fixed background');
 }finally{await browser.close();}

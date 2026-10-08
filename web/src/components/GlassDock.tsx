@@ -1,17 +1,14 @@
-import {useEffect,useRef,useState,type PointerEvent,type ReactNode} from 'react';
+import {Children,useEffect,useRef,useState,type PointerEvent,type ReactNode} from 'react';
 import '../theme/liquid.css';
 
-const TAB_ICONS=['home','search','settings'] as const;
-const DROP_WIDTH=96;
 const DROP_HEIGHT=64;
 const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
 const MASK_STEPS=20;
-let capsuleLenses:string[]|undefined;
-const capsuleMasks=Array.from({length:MASK_STEPS+1},(_,step)=>{
-  const p=step/MASK_STEPS,x=12-10*p,y=6-5*p;
-  return 'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="64"><rect x="${x}" y="${y}" width="${96-2*x}" height="${64-2*y}" rx="${32-y}" fill="white"/></svg>`);
-});
-
+const capsuleCache=new Map<number,{masks:string[];lenses:string[]}>();
+function dropShape(width:number,step:number){
+ const p=step/MASK_STEPS,x=12-10*p,y=6-5*p;
+ return {x,y,radius:Math.min(16+4*p,(width-2*x)/2,(DROP_HEIGHT-2*y)/2)};
+}
 // 位移贴图只由尺寸决定；页面滚动时由浏览器直接重采样真实背景。
 function lensMap(width:number,height:number,radius:number,insetX=0,insetY=0){
   const canvas=document.createElement('canvas');canvas.width=Math.ceil(width/2);canvas.height=Math.ceil(height/2);
@@ -30,43 +27,47 @@ function lensMap(width:number,height:number,radius:number,insetX=0,insetY=0){
   }
   ctx.putImageData(pixels,0,0);return canvas.toDataURL('image/png');
 }
-function getCapsuleLenses(){
-  return capsuleLenses??=Array.from({length:MASK_STEPS+1},(_,step)=>{
-    const p=step/MASK_STEPS,x=12-10*p,y=6-5*p;
-    return lensMap(DROP_WIDTH,DROP_HEIGHT,DROP_HEIGHT/2-y,x,y);
-  });
+function getCapsules(width:number){
+ let cached=capsuleCache.get(width);if(cached)return cached;
+ const masks=Array.from({length:MASK_STEPS+1},(_,step)=>{const {x,y,radius}=dropShape(width,step);return 'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="64"><rect x="${x}" y="${y}" width="${width-2*x}" height="${64-2*y}" rx="${radius}" fill="white"/></svg>`);});
+ const lenses=Array.from({length:MASK_STEPS+1},(_,step)=>{const {x,y,radius}=dropShape(width,step);return lensMap(width,DROP_HEIGHT,radius,x,y);});
+ cached={masks,lenses};capsuleCache.set(width,cached);return cached;
 }
 
 type Motion={x:number;vx:number;targetX:number;press:number;pressTarget:number;releasePending:boolean;last:number};
 type Contact={id:number;startX:number;startY:number;moved:boolean}|null;
 
 export function GlassDock({enabled,distortion,activeIndex,onSelect,children}:{enabled:boolean;distortion:number;activeIndex:number;onSelect:(index:number)=>void|boolean;children:ReactNode}){
+  const count=Children.count(children);
   const ref=useRef<HTMLElement>(null),drop=useRef<HTMLDivElement>(null),filterLens=useRef<SVGFEImageElement>(null);
   const [dropMap,setDropMap]=useState(''),[dragging,setDragging]=useState(false);
   const width=useRef(0),height=useRef(76),rect=useRef<DOMRect|null>(null),contact=useRef<Contact>(null),raf=useRef(0),suppressUntil=useRef(0);
   const labels=useRef<HTMLElement[]>([]);
   const motion=useRef<Motion>({x:0,vx:0,targetX:0,press:0,pressTarget:0,releasePending:false,last:0});
   const selected=useRef(activeIndex);selected.current=activeIndex;
-  const center=(index:number)=>width.current*(index+.5)/TAB_ICONS.length;
+  const dropWidth=()=>Math.max(48,Math.min(96,Math.round(width.current/count)-4));
+  const center=(index:number)=>width.current*(index+.5)/count;
 
   function paint(){
     const m=motion.current,node=drop.current,dock=ref.current;if(!node||!dock)return;
     // 背景始终在固定大小的图层内采样。按压只扩大裁切轮廓，绝不缩放背景。
-    const x=clamp(m.x,DROP_WIDTH/2,width.current-DROP_WIDTH/2),cy=height.current/2;
-    node.style.transform=`translate3d(${x-DROP_WIDTH/2}px,${cy-DROP_HEIGHT/2}px,0)`;
+    const capsuleWidth=dropWidth(),capsules=getCapsules(capsuleWidth);node.style.setProperty('--drop-width',`${capsuleWidth}px`);
+    const x=clamp(m.x,capsuleWidth/2,width.current-capsuleWidth/2),cy=height.current/2;
+    node.style.transform=`translate3d(${x-capsuleWidth/2}px,${cy-DROP_HEIGHT/2}px,0)`;
     const step=Math.round(clamp(m.press,0,1)*MASK_STEPS);
     // 裁切 mask、透镜贴图与高光边界使用相同缓存档位，避免边缘错位。
-    const outlinePress=step/MASK_STEPS;
-    node.style.setProperty('--drop-inset-x',`${12-10*outlinePress}px`);
-    node.style.setProperty('--drop-inset-y',`${6-5*outlinePress}px`);
+    const shape=dropShape(capsuleWidth,step);
+    node.style.setProperty('--drop-inset-x',`${shape.x}px`);
+    node.style.setProperty('--drop-inset-y',`${shape.y}px`);
+    node.style.setProperty('--drop-radius',`${shape.radius}px`);
     node.style.setProperty('--drop-press',String(m.press));
-    node.style.setProperty('--drop-mask',`url("${capsuleMasks[step]}")`);
-    if(enabled&&distortion){const lens=getCapsuleLenses()[step];if(filterLens.current?.getAttribute('href')!==lens)filterLens.current?.setAttribute('href',lens);}
-    const nearest=clamp(Math.floor(x/(width.current/TAB_ICONS.length)),0,TAB_ICONS.length-1);
+    node.style.setProperty('--drop-mask',`url("${capsules.masks[step]}")`);
+    if(enabled&&distortion){const lens=capsules.lenses[step];if(filterLens.current?.getAttribute('href')!==lens)filterLens.current?.setAttribute('href',lens);}
+    const nearest=clamp(Math.floor(x/(width.current/count)),0,count-1);
     if(dock.dataset.preview!==String(nearest))dock.dataset.preview=String(nearest);
     // 只放大固定按钮里的前景内容；命中范围、背景采样及文字布局保持独立。
     labels.current.forEach((label,index)=>{
-      const proximity=Math.exp(-Math.pow((x-center(index))/(width.current/4),2)*2.4);
+      const proximity=Math.exp(-Math.pow((x-center(index))/(width.current/count),2)*2.4);
       const focus=proximity*m.press;
       label.style.transform=`translate3d(0,${-4*focus}px,0) scale(${1+.25*focus})`;
     });
@@ -79,7 +80,7 @@ export function GlassDock({enabled,distortion,activeIndex,onSelect,children}:{en
     m.vx+=(stiffness*(m.targetX-m.x)-damping*m.vx)*dt;
     m.x+=m.vx*dt;
     // 与参考实现一样，胶囊接近目标后才收起透镜，弹性移动期间保留放大。
-    if(m.releasePending&&Math.abs(m.targetX-m.x)<Math.max(2,width.current/TAB_ICONS.length*.025)){m.releasePending=false;m.pressTarget=0;}
+    if(m.releasePending&&Math.abs(m.targetX-m.x)<Math.max(2,width.current/count*.025)){m.releasePending=false;m.pressTarget=0;}
     m.press+=(m.pressTarget-m.press)*Math.min(1,dt*18);
     paint();
     const moving=Math.abs(m.targetX-m.x)+Math.abs(m.vx)*.02+Math.abs(m.pressTarget-m.press)*50>0.25;
@@ -93,11 +94,11 @@ export function GlassDock({enabled,distortion,activeIndex,onSelect,children}:{en
       const w=Math.round(entry.contentRect.width),h=Math.round(entry.contentRect.height),key=`${w}:${h}`;
       if(!w||!h||size===key)return;size=key;width.current=w;height.current=h;rect.current=node.getBoundingClientRect();
       const x=center(selected.current),m=motion.current;if(!m.x)m.x=x;m.targetX=x;paint();animate();
-      if(enabled&&distortion)setDropMap(getCapsuleLenses()[0]);
+      if(enabled&&distortion)setDropMap(getCapsules(dropWidth()).lenses[0]);
     });observer.observe(node);
     return()=>observer.disconnect();
   },[enabled]);
-  useEffect(()=>{if(!enabled||!distortion)setDropMap('');else if(width.current)setDropMap(getCapsuleLenses()[0]);},[enabled,distortion]);
+  useEffect(()=>{if(!enabled||!distortion)setDropMap('');else if(width.current)setDropMap(getCapsules(dropWidth()).lenses[0]);},[enabled,distortion]);
   useEffect(()=>{if(!contact.current){const m=motion.current,target=center(activeIndex);if(Math.abs(target-m.x)>8){m.pressTarget=1;m.releasePending=true;}m.targetX=target;animate();}},[activeIndex]);
   useEffect(()=>()=>cancelAnimationFrame(raf.current),[]);
   function pointerDown(e:PointerEvent<HTMLElement>){
@@ -117,13 +118,13 @@ export function GlassDock({enabled,distortion,activeIndex,onSelect,children}:{en
     const c=contact.current,r=rect.current;if(!c||c.id!==e.pointerId||!r)return;
     const dx=e.clientX-c.startX,dy=e.clientY-c.startY;
     if(Math.hypot(dx,dy)>8&&!c.moved)c.moved=true;
-    const m=motion.current;m.targetX=clamp(e.clientX-r.left,DROP_WIDTH/2,width.current-DROP_WIDTH/2);
+    const m=motion.current;m.targetX=clamp(e.clientX-r.left,dropWidth()/2,width.current-dropWidth()/2);
     animate();
   }
   function finish(e:PointerEvent<HTMLElement>,cancel=false){
     const c=contact.current;if(!c||c.id!==e.pointerId)return;
     contact.current=null;setDragging(false);if(ref.current?.hasPointerCapture(e.pointerId))ref.current.releasePointerCapture(e.pointerId);
-    const index=cancel?selected.current:clamp(Math.floor(motion.current.targetX/(width.current/TAB_ICONS.length)),0,TAB_ICONS.length-1);
+    const index=cancel?selected.current:clamp(Math.floor(motion.current.targetX/(width.current/count)),0,count-1);
     motion.current.targetX=center(index);motion.current.releasePending=true;animate();
     // 指针捕获后的 click 会落在 nav 上；轻点与滑动都在 pointerup 结算。
     // 键盘激活仍由 button 自己的 onClick 处理。
@@ -131,7 +132,7 @@ export function GlassDock({enabled,distortion,activeIndex,onSelect,children}:{en
   }
   return <><svg className="filter-defs" aria-hidden="true"><defs>
     <filter id="glass-droplet" x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB"><feImage ref={filterLens} href={dropMap||undefined} width="100%" height="100%" preserveAspectRatio="none" result="lens"/><feComponentTransfer in="lens" result="centeredLens"><feFuncR type="linear" slope="1" intercept={-.5/255}/><feFuncG type="linear" slope="1" intercept={-.5/255}/></feComponentTransfer><feDisplacementMap in="SourceGraphic" in2="centeredLens" scale={distortion*7} xChannelSelector="R" yChannelSelector="G"/></filter>
-  </defs></svg><nav ref={ref} className="dock" aria-label="主导航" data-droplet-ready={!!dropMap} data-dragging={dragging} data-preview={activeIndex}
+  </defs></svg><nav ref={ref} className="dock" aria-label="主导航" data-droplet-ready={!!dropMap} data-dragging={dragging} data-preview={activeIndex} data-count={count} style={{gridTemplateColumns:`repeat(${count},minmax(0,1fr))`}}
     onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={e=>finish(e)} onPointerCancel={e=>finish(e,true)} onLostPointerCapture={e=>{if(e.target===ref.current)finish(e,true);}}
     onClickCapture={e=>{if(performance.now()<suppressUntil.current){e.preventDefault();e.stopPropagation();suppressUntil.current=0;}}}>
     <div className="dock-motion-layer">

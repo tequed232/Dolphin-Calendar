@@ -4,6 +4,7 @@
 
 | 组件 | 用途 | 许可证 |
 |---|---|---|
+| SheetJS CE（@e965/xlsx 0.20.3 分发） | XLSX / XLS 本机解析 | Apache-2.0，完整文本见 `legal/APACHE-2.0.txt` |
 | React / React DOM 19.1.1 | Web 界面 | MIT，完整文本见 `legal/REACT-LICENSE.txt` |
 | Material Symbols（Google），通过 @material-symbols/svg-400 0.47.5 分发 | 27 个本地 Rounded SVG | Apache-2.0，完整文本见 `web/src/assets/icons/LICENSE` |
 | AndroidX WebKit 1.12.1 / Core 1.15.0 | 安全本地 WebView、FileProvider、系统兼容 | Apache-2.0 |

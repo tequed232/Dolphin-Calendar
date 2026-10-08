@@ -94,7 +94,7 @@ object AppUpdates {
                             check(Regex("^[vV]?\\d{1,4}\\.\\d{1,4}\\.\\d{1,4}$").matches(version)) { "版本号格式不支持" }
                             val page = raw.getString("html_url")
                             check(trustedRelease(page)) { "更新页面地址不匹配" }
-                            val release = JSONObject().put("version", version).put("url", page).put("notes", raw.optString("body").take(12000))
+                            val release = JSONObject().put("version", version).put("url", page).put("notes", raw.optString("body").take(12000)).put("title", raw.optString("name", version)).put("publishedAt", raw.optString("published_at"))
                             val assets = raw.optJSONArray("assets")
                             val candidates = (0 until (assets?.length() ?: 0)).map { assets!!.getJSONObject(it) }.filter {
                                 it.optString("name").endsWith(".apk", true) && !it.optString("name").contains("debug", true) && trustedAsset(it.optString("browser_download_url"))

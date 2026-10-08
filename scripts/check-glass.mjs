@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {launchBrowser} from './check-browser.mjs';
@@ -40,7 +41,9 @@ try{
  assert.ok(changed>80,`局部位移滤镜未真正改变背景像素: ${changed}；${JSON.stringify(renderer)}`);
  await mkdir('build/evidence',{recursive:true});await writeFile('build/evidence/glass-refraction.png',refracted);await writeFile('build/evidence/glass-flat.png',flat);
  await page.evaluate(()=>{document.getElementById('glass-test-pattern').remove();document.documentElement.dataset.refraction='true';document.querySelector('#glass-droplet feDisplacementMap').setAttribute('scale','7');});
- await page.getByRole('button',{name:'设置',exact:true}).click();await page.screenshot({path:'build/evidence/classic-settings.png'});
+ await goTab(page,'设置');await page.screenshot({path:'build/evidence/classic-settings.png'});
+ // Compact settings fit on this phone; use a smaller viewport to verify real scrolling.
+ await page.setViewportSize({width:390,height:640});
  const scroll=await page.evaluate(async()=>{
   const screen=document.querySelector('.screen.active'),glass=document.querySelector('.dock-droplet-window');
   const samples=[];for(let n=0;n<14;n++){

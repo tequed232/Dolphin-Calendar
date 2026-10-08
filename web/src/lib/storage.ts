@@ -1,4 +1,5 @@
 import { initialData, type AppData, type Settings } from './model';
+import {migrateSchedule,migrateDisplay} from './migration';
 import {normalizeHolidayDays,normalizeHolidayRanges} from './holidays';
 const DATABASE = 'dolphin-calendar';
 let connection: Promise<IDBDatabase> | undefined;
@@ -20,6 +21,7 @@ export async function loadData():Promise<AppData> {
       const legacyAppearance=!(saved as Partial<AppData>).appearanceRevision;
       const savedSettings={...saved.settings} as Partial<Settings> & {contour?:number};
       delete savedSettings.contour;
+      savedSettings.timetableMode??=(savedSettings as {viewMode?:string}).viewMode==='grid'?'grid':'list';
       const settings={...defaults.settings,...savedSettings,...(legacyAppearance?{dynamicColor:false}:{})};
       const glassMode=savedSettings.glassMode;
       settings.glassMode=glassMode==='off'||glassMode==='partial'||glassMode==='full'?glassMode:savedSettings.glass===false?'off':'partial';
@@ -28,7 +30,7 @@ export async function loadData():Promise<AppData> {
       const background=saved.background?.url?.match(/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/)&&saved.background.url.length<=3_000_000?saved.background:undefined;
       const holidayCalendarIds=Array.isArray(saved.holidayCalendarIds)?[...new Set(saved.holidayCalendarIds.filter(id=>typeof id==='string'&&id.length>0))].sort():[];
       const holidaySourceNames=Array.isArray(saved.holidaySourceNames)?saved.holidaySourceNames.filter(name=>typeof name==='string'):[];
-      resolve({...defaults,...saved,background,appearanceRevision:2,holidays:normalizeHolidayDays(saved.holidays).slice(-12000),holidayRanges:normalizeHolidayRanges(saved.holidayRanges).slice(-6),holidayCalendarIds,holidaySourceNames,settings:{...settings,holidayMarkers:!!settings.holidayMarkers,backgroundEnabled:!!background&&!!settings.backgroundEnabled}});
+      resolve({...defaults,...saved,schedule:migrateSchedule(saved.schedule),background,appearanceRevision:2,holidays:normalizeHolidayDays(saved.holidays).slice(-12000),holidayRanges:normalizeHolidayRanges(saved.holidayRanges).slice(-6),holidayCalendarIds,holidaySourceNames,settings:{...migrateDisplay(settings),holidayMarkers:!!settings.holidayMarkers,backgroundEnabled:!!background&&!!settings.backgroundEnabled}});
     };r.onerror=()=>reject(r.error);
   });
 }
@@ -38,3 +40,7 @@ export async function saveData(data: AppData) {
     tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error??new Error('保存被中断'));
   });
 }
+
+// Release metadata is separate from the user's schedule; failed update checks never write app data.
+export async function loadReleaseCache():Promise<unknown>{const db=await open();return new Promise((resolve,reject)=>{const request=db.transaction('state').objectStore('state').get('release');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+export async function saveReleaseCache(value:unknown){const db=await open();return new Promise<void>((resolve,reject)=>{const tx=db.transaction('state','readwrite');tx.objectStore('state').put(value,'release');tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}

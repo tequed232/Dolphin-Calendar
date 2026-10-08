@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {launchBrowser} from './check-browser.mjs';
@@ -14,11 +15,11 @@ try{
   const course=await page.locator('.next-course').boundingBox(),action=await page.locator('.nav-fab').boundingBox();
   assert.ok(course.y+course.height<=action.y-3,'短屏首张课程卡不应被固定按钮遮挡');pass('320×640 首张课程卡的标题、时间与教室不被快捷按钮遮挡');
   await page.screenshot({path:`build/evidence/${version}-compact-home.png`});
-  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="editor"]').click();await page.locator('.screen.active .import-entry').click();await page.waitForTimeout(350);
-  const parse=await page.getByRole('button',{name:'解析并预览',exact:true}).boundingBox(),dock=await page.locator('.dock').boundingBox();assert.ok(parse.y+parse.height<dock.y-10);pass('短屏导入主操作与底栏保持可见间隔');
+  await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.locator('.screen.active .import-entry').click();await page.waitForTimeout(350);
+  const file=await page.locator('.screen.active .import-file-button').boundingBox();assert.equal(await page.locator('.dock').count(),0);assert.ok(file.y+file.height<640-18);pass('短屏导入文件主操作完整可见，二级任务不显示底栏');
   await page.screenshot({path:`build/evidence/${version}-compact-import.png`});
-  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="appearance"]').click();await page.getByRole('button',{name:/^背景(?:\s|$)/}).click();await page.waitForTimeout(350);
-  const pick=await page.locator('.background-card .file-button').boundingBox();assert.ok(pick.y+pick.height<dock.y-12);pass('短屏背景选图按钮完整显示，未贴在底栏后方');
+  await goTab(page,'设置');await page.locator('[data-setting="appearance"]').click();await page.getByRole('button',{name:/^背景(?:\s|$)/}).click();await page.waitForTimeout(350);
+  const pick=await page.locator('.background-card .file-button').boundingBox();assert.equal(await page.locator('.dock').count(),0);assert.ok(pick.y+pick.height<640-18);pass('短屏背景选图按钮完整显示，二级任务不显示底栏');
   await page.getByLabel('选择背景图片',{exact:true}).setInputFiles({name:'布局背景.png',mimeType:'image/png',buffer:await readFile('web/src/assets/brand/app-icon.png')});await page.locator('.preview-photo').waitFor();await page.waitForTimeout(4500);
   const preview=page.locator('.background-preview'),photo=page.locator('.preview-photo');
   async function corners(){const visible=await preview.screenshot();await photo.evaluate(e=>e.style.visibility='hidden');const hidden=await preview.screenshot();await photo.evaluate(e=>e.style.removeProperty('visibility'));return page.evaluate(async images=>{const values=await Promise.all(images.map(async source=>{const image=new Image();image.src=source;await image.decode();const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);return {width:image.width,height:image.height,pixels:ctx.getImageData(0,0,image.width,image.height).data};}));const [a,b]=values;let outside=0,inside=0;for(let y=0;y<a.height;y++)for(let x=0;x<a.width;x++){const index=(y*a.width+x)*4,change=Math.abs(a.pixels[index]-b.pixels[index])+Math.abs(a.pixels[index+1]-b.pixels[index+1])+Math.abs(a.pixels[index+2]-b.pixels[index+2]);if(change<12)continue;const cornerX=x<25?25:x>a.width-25?a.width-25:x,cornerY=y<25?25:y>a.height-25?a.height-25:y;if(Math.hypot(x+.5-cornerX,y+.5-cornerY)>26)outside++;else inside++;}return {outside,inside};},[visible,hidden].map(buffer=>'data:image/png;base64,'+buffer.toString('base64')));}

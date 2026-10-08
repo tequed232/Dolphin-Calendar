@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {launchBrowser} from './check-browser.mjs';
@@ -36,21 +37,21 @@ try{
   await page.getByRole('dialog',{name:'添加课程',exact:true}).waitFor();
   assert.equal(await page.getByLabel('课程名',{exact:true}).inputValue(),'');
   await page.getByRole('button',{name:'关闭对话框',exact:true}).click();
-  await page.getByRole('button',{name:'首页',exact:true}).click();
+  await goTab(page,'列表');
   await active().getByRole('button',{name:'导入我的课表',exact:true}).click();
-  await active().getByRole('textbox',{name:'课表内容',exact:true}).waitFor();
+  await pasteJSON(page);await active().getByRole('textbox',{name:'课表内容',exact:true}).waitFor();
   pass('空课表首页可直接手动添加或进入 JSON 导入，不必寻找设置入口');
 
-  await page.getByRole('button',{name:'搜索',exact:true}).click();
+  await goTab(page,'搜索');
   await active().getByRole('button',{name:'手动添加课程',exact:true}).click();
   await page.getByRole('dialog',{name:'添加课程',exact:true}).waitFor();
   await page.getByRole('button',{name:'关闭对话框',exact:true}).click();
-  await page.getByRole('button',{name:'搜索',exact:true}).click();
+  await goTab(page,'搜索');
   await active().getByRole('button',{name:'导入课表',exact:true}).click();
-  await active().getByRole('textbox',{name:'课表内容',exact:true}).waitFor();
+  await pasteJSON(page);await active().getByRole('textbox',{name:'课表内容',exact:true}).waitFor();
   pass('空课表搜索页也能直接导入、手动添加第一门课');
 
-  await page.getByRole('button',{name:'搜索',exact:true}).click();
+  await goTab(page,'搜索');
   await page.getByRole('searchbox',{name:'搜索课程',exact:true}).fill('数学');
   assert.equal(await active().getByRole('heading',{name:'先添加你的课表',exact:true}).count(),1);
   assert.equal(await page.locator('#search-result-status').textContent(),'课表中还没有课程');
@@ -114,7 +115,7 @@ try{
   assert.match(await page.locator('.free-day').innerText(),/今天的课程已结束/);
   pass('主页导航目标与所选日期一致，课前、上课中、已结束状态按实际节次切换');
 
-  await page.getByRole('button',{name:'搜索',exact:true}).click();
+  await goTab(page,'搜索');
   const input=page.getByRole('searchbox',{name:'搜索课程',exact:true});
   await input.fill('  李老师  ');
   assert.equal(await page.locator('.result-card').count(),1);
@@ -139,7 +140,7 @@ try{
 
   await page.setViewportSize({width:330,height:640});
   await seed([],{scale:1.1,mode:'dark'});
-  await page.getByRole('button',{name:'搜索',exact:true}).click();
+  await goTab(page,'搜索');
   const query=page.getByRole('searchbox',{name:'搜索课程',exact:true});
   await query.fill('测试输入字段不会挤出屏幕');
   const fit=await page.locator('.search-box').evaluate(el=>{const a=el.getBoundingClientRect(),input=el.querySelector('input').getBoundingClientRect(),clear=el.querySelector('button').getBoundingClientRect();return {right:a.right,inputRight:input.right,clearLeft:clear.left,clearRight:clear.right,width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth};});
@@ -147,7 +148,7 @@ try{
   assert.equal(fit.scroll,fit.width);
   await revealAction(active().getByRole('button',{name:'手动添加课程',exact:true}));
   await page.screenshot({path:`build/evidence/${version}-search-empty-dark-narrow.png`});
-  await page.getByRole('button',{name:'首页',exact:true}).click();
+  await goTab(page,'列表');
   await revealAction(active().getByRole('button',{name:'没有课表文件？手动添加',exact:true}));
   const homeOverflow=await active().evaluate(el=>el.scrollWidth-el.clientWidth);assert.ok(homeOverflow<=1);
   await page.screenshot({path:`build/evidence/${version}-home-empty-dark-narrow.png`});
@@ -161,6 +162,24 @@ try{
   assert.equal(await page.getByRole('dialog',{name:'选择日期',exact:true}).count(),0);
   assert.equal(await page.locator('.dock').count(),1);
   pass('330×640、110% 比例、深色与减少动态效果下，输入、清除、空状态操作均无横向溢出');
+  await seed(courses,{showTimes:false});await select('2026-10-07');
+  assert.equal(await page.locator('.period-label > span').count(),0);
+  assert.equal(await page.locator('.timetable .course-topline > span').count(),1);
+  assert.doesNotMatch(await page.locator('.next-time').innerText(),/\d{2}:\d{2}/);
+  await page.reload();await select('2026-10-07');
+  assert.equal(await page.locator('.period-label > span').count(),0);
+  await seed(courses,{showTimes:true});await select('2026-10-07');
+  assert.ok(await page.locator('.period-label > span').count()>0);
+  assert.equal(await page.locator('.timetable .course-topline > span').count(),2);
+  assert.match(await page.locator('.next-time').innerText(),/\d{2}:\d{2}/);
+  pass('列表时间显示与偏好一致，隐藏后刷新仍生效，重新开启恢复课程时间');
+  const dated={...course('dated','临时讲座',3,1,2,[1]),temporary:true,specificDate:'2026-10-07'};
+  await seed([dated]);await select('2026-10-07');
+  await page.locator('.timetable .course-card').click();
+  assert.match(await page.locator('.course-sheet .detail-row').filter({hasText:'上课日期'}).innerText(),/2026\/10\/07/);
+  assert.equal(await page.locator('.course-sheet .detail-row').filter({hasText:'上课周次'}).count(),0);
+  await page.locator('.course-sheet').getByRole('button',{name:'关闭课程详情',exact:true}).click();
+  pass('指定日期临时课程的详情展示实际日期，不误标为重复上课周次');
   assert.deepEqual(errors,[]);
   await writeFile(`build/evidence/${version}-home-search-experience-results.json`,JSON.stringify({version,checks,errors},null,2));
 }finally{await browser.close();}

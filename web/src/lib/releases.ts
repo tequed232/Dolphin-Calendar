@@ -1,0 +1,6 @@
+import {APP_VERSION} from '../meta';
+export const RELEASES_URL='https://github.com/tequed232/Dolphin-Calendar/releases';
+export const RELEASE_API='https://api.github.com/repos/tequed232/Dolphin-Calendar/releases/latest';
+export type Release={version:string;url:string;notes:string;title?:string;publishedAt?:string;assetUrl?:string;assetSize?:number;assetName?:string};
+export function newerVersion(candidate:string,current=APP_VERSION){const pattern=/^[vV]?\d{1,4}\.\d{1,4}\.\d{1,4}$/;if(!pattern.test(candidate)||!pattern.test(current))return false;const a=candidate.replace(/^[vV]/,'').split('.').map(Number),b=current.replace(/^[vV]/,'').split('.').map(Number);for(let i=0;i<3;i++)if(a[i]!==b[i])return a[i]>b[i];return false;}
+export function releaseFromAPI(raw:unknown):Release{const r=raw as Record<string,unknown>;if(!r||r.draft||r.prerelease||typeof r.tag_name!=='string'||! /^[vV]?\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(r.tag_name)||typeof r.html_url!=='string'||!r.html_url.startsWith(RELEASES_URL+'/tag/'))throw new Error('没有可用的正式版本');return {version:r.tag_name,url:r.html_url,notes:typeof r.body==='string'?r.body.slice(0,12000):'',title:typeof r.name==='string'?r.name:r.tag_name,publishedAt:typeof r.published_at==='string'?r.published_at:undefined};}

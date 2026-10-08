@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import path from 'node:path';
@@ -54,7 +55,7 @@ try{
   await page.getByRole('button',{name:'上一步',exact:true}).click();await page.waitForTimeout(220);assert.equal(await page.locator('.onboarding').getAttribute('data-step'),'1');
   await finalStep(page);assert.match(await page.locator('.onboarding').innerText(),/我到了.*收起/);assert.match(await page.locator('.onboarding').innerText(),/背景毛玻璃与底栏质感/);assert.doesNotMatch(await page.locator('.onboarding').innerText(),/关闭、部分或完全/);pass('步骤可前后切换，日期、导航、实时状态与当前可见外观设置均有说明');
   await assertNoPermission(page);pass('完整引导不申请权限，不读取日历，不启动提醒或导航服务');
-  await page.getByRole('button',{name:'先逛一逛',exact:true}).click();await page.locator('.onboarding').waitFor({state:'hidden'});assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'home');
+  await page.getByRole('button',{name:'先逛一逛',exact:true}).click();await page.locator('.onboarding').waitFor({state:'hidden'});assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'list');
   const skipped=await stored(page);assert.equal(skipped.onboarded,true);assert.deepEqual(skipped.schedule.courses,[]);
   await page.reload();await page.waitForFunction(()=>!document.querySelector('.load-note'));assert.equal(await page.locator('.onboarding').count(),0);pass('任何步骤可跳过，保存完成状态且下次启动不重复展示');
 
@@ -73,7 +74,7 @@ try{
   // 已有课表重看引导只展示说明，保持课表、教材与个性设置完全不变。
   await page.evaluate(async()=>{const db=await new Promise(resolve=>{const r=indexedDB.open('dolphin-calendar',1);r.onsuccess=()=>resolve(r.result);});const old=await new Promise(resolve=>{const r=db.transaction('state').objectStore('state').get('app');r.onsuccess=()=>resolve(r.result);});old.schedule.courses=[{id:'onboarding-preserved',name:'原有课程',teacher:'陈老师',room:'16栋203号教室',day:1,start:1,end:2,weeks:[1,3,5],color:'sage',notes:'保持原有内容'}];old.books={'onboarding-preserved':{title:'原有教材'}};old.settings.backgroundBlur=7;old.settings.school='原有学校';const tx=db.transaction('state','readwrite');tx.objectStore('state').put(old,'app');await new Promise(resolve=>tx.oncomplete=resolve);db.close();});
   await page.reload();await page.waitForFunction(()=>!document.querySelector('.load-note'));const before=await stored(page);
-  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="about"]').click();await page.getByRole('button',{name:/重新.*引导|再次.*引导|使用引导/}).click();await page.locator('.onboarding[data-step="1"]').waitFor();await finalStep(page);await page.getByRole('button',{name:'先逛一逛',exact:true}).click();await page.locator('.onboarding').waitFor({state:'hidden'});assert.deepEqual(await stored(page),before);pass('关于页重看从第 1 步开始，跳过后原有课程、教材、学校和背景设置完全保留');
+  await goTab(page,'设置');await page.locator('[data-setting="about"]').click();await page.getByRole('button',{name:/重新.*引导|再次.*引导|使用引导/}).click();await page.locator('.onboarding[data-step="1"]').waitFor();await finalStep(page);await page.getByRole('button',{name:'先逛一逛',exact:true}).click();await page.locator('.onboarding').waitFor({state:'hidden'});assert.deepEqual(await stored(page),before);pass('关于页重看从第 1 步开始，跳过后原有课程、教材、学校和背景设置完全保留');
 
   const compact=await fresh({viewport:{width:320,height:640},colorScheme:'dark',reducedMotion:'reduce'});await compact.evaluate(()=>{document.documentElement.style.setProperty('--ui-scale','1.1');window.dolphinInsets?.(28,24,0,640);});
   const geometry=[];
@@ -87,7 +88,9 @@ try{
 
   if(process.env.TEST_OFFLINE==='1'){
     const offline=await browser.newPage({viewport:{width:320,height:640}}),requests=[];offline.on('request',request=>{if(/^https?:/.test(request.url()))requests.push(request.url());});
-    await offline.goto(pathToFileURL(path.resolve('web/dist/Dolphin-Calendar-offline.html')).href);await offline.locator('.onboarding[data-step="1"]').waitFor();await finalStep(offline);assert.equal(await offline.locator('.onboarding .brand-art').evaluate(image=>image.complete&&image.naturalWidth>0),true);assert.deepEqual(requests,[]);await offline.getByRole('button',{name:'先逛一逛',exact:true}).click();await offline.locator('.onboarding').waitFor({state:'hidden'});pass('双击离线网页可完成全部引导，品牌与图标无需任何网络请求');await offline.close();
+    const releaseEndpoint='https://api.github.com/repos/tequed232/Dolphin-Calendar/releases/latest';
+    await offline.route(releaseEndpoint,route=>route.fulfill({json:{tag_name:`v${version}`,name:'当前正式版',html_url:`https://github.com/tequed232/Dolphin-Calendar/releases/tag/v${version}`,body:'',assets:[]}}));
+    await offline.goto(pathToFileURL(path.resolve('web/dist/Dolphin-Calendar-offline.html')).href);await offline.locator('.onboarding[data-step="1"]').waitFor();await finalStep(offline);assert.equal(await offline.locator('.onboarding .brand-art').evaluate(image=>image.complete&&image.naturalWidth>0),true);assert.ok(requests.every(url=>url===releaseEndpoint),JSON.stringify(requests));await offline.getByRole('button',{name:'先逛一逛',exact:true}).click();await offline.locator('.onboarding').waitFor({state:'hidden'});pass('双击离线网页可完成全部引导，品牌与图标本地加载；仅允许官方版本检查');await offline.close();
   }
   assert.deepEqual(errors,[]);await writeFile(`build/evidence/${version}-onboarding-results.json`,JSON.stringify({version,checks,errors,compactGeometry:geometry,offlineChecked:process.env.TEST_OFFLINE==='1'},null,2));
 }finally{await Promise.allSettled(contexts.map(context=>context.close()));await browser.close();}

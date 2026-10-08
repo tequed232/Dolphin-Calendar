@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {launchBrowser} from './check-browser.mjs';
@@ -36,11 +37,11 @@ try{
     if(saved?.autoUpdate===false&&saved?.directDownload===true)break;
     if(attempt===49)throw new Error('更新偏好未保存');await page.waitForTimeout(50);
   }
-  await page.reload();await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="about"]').click();await page.getByRole('button',{name:'应用更新',exact:false}).click();
+  await page.reload();await goTab(page,'设置');await page.locator('[data-setting="about"]').click();await page.getByRole('button',{name:'应用更新',exact:false}).click();
   assert.equal(await page.locator('#auto-update').isChecked(),false);assert.equal(await page.locator('#direct-download').isChecked(),true);
   await page.setViewportSize({width:320,height:800});assert.equal(await page.locator('[data-screen="updates"].active').evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
   await page.evaluate(()=>{window.mockUpdate.available=false;window.mockUpdate.release=null;window.mockUpdate.message='GitHub 尚未发布正式版本';window.dolphinNative({type:'updateStatus',update:structuredClone(window.mockUpdate)});});
-  await page.getByRole('button',{name:'首页',exact:true}).click();assert.equal(await page.locator('.update-indicator').count(),0);
+  await goTab(page,'列表');assert.equal(await page.locator('.update-indicator').count(),0);
   assert.deepEqual(errors,[]);await mkdir('build/evidence',{recursive:true});await page.screenshot({path:'build/evidence/1.4.3-update-home.png'});
   console.log('PASS 更新徽标与路由 / 手动检查 / 独立下载开关与进度 / 无更新状态 / 偏好保存 / 窄屏（原生桥模拟）');
 }finally{await browser.close();}

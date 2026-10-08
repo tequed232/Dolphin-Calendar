@@ -21,10 +21,17 @@ export function AppProvider({children}:{children:ReactNode}) {
     });
     queue.current=task.catch(()=>{});try{await task;}catch(e){toast(`保存失败：${(e as Error).message}`);throw e;}
   }
+  const nativeSnapshot=useRef<{schedule:AppData['schedule'];books:AppData['books'];settings:string}|null>(null);
   const holidayReader=useHolidayReader(data,update);
-  const appUpdates=useAppUpdates();
+  const appUpdates=useAppUpdates(data.settings.autoUpdate,ready);
+  const {notificationsEnabled,reminders,advance,journeyLive,pet,poke,lines,school,map,autoUpdate,directDownload}=data.settings;
+  const nativeSettings=JSON.stringify({notificationsEnabled,reminders,advance,journeyLive,pet,poke,lines,school,map,autoUpdate,directDownload});
   useEffect(()=>{
     if(!ready) return;
+    const settings=nativeSettings;
+    const previous=nativeSnapshot.current;
+    if(previous?.schedule===data.schedule&&previous.books===data.books&&previous.settings===settings)return;
+    nativeSnapshot.current={schedule:data.schedule,books:data.books,settings};
     let active=true;
     native('sync',{schedule:data.schedule,settings:data.settings,bookTitles:Object.fromEntries(Object.entries(data.books).map(([course,book])=>[course,book.title]))});
     void (async()=>{
@@ -38,7 +45,7 @@ export function AppProvider({children}:{children:ReactNode}) {
       if(active) native('bookCovers',{covers});
     })();
     return()=>{active=false;};
-  },[ready,data.schedule,data.settings,data.books]);
+  },[ready,data.schedule,nativeSettings,data.books]);
   return <AppContext.Provider value={{data,ready,error,update,toast,holidayReader,appUpdates}}>{children}{message&&<div className="toast" role="status">{message}</div>}</AppContext.Provider>;
 }
 export const useApp=()=>useContext(AppContext);

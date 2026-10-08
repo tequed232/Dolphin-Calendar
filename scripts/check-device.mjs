@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {execFileSync,spawn} from 'node:child_process';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -18,18 +19,18 @@ try{
   // 保存调试包现有业务数据；任何测试结束都恢复，不清库、不碰旧应用。
   saved=await page.evaluate(()=>new Promise((resolve,reject)=>{const r=indexedDB.open('dolphin-calendar',1);r.onsuccess=()=>{const db=r.result;const q=db.transaction('state').objectStore('state').get('app');q.onsuccess=()=>{resolve(q.result??null);db.close();};q.onerror=()=>reject(q.error);};r.onerror=()=>reject(r.error);}));
   const intro=page.getByRole('button',{name:'先逛一逛',exact:true});if(await intro.isVisible())await intro.click();
-  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="editor"]').click();await page.locator('.screen.active .import-entry').click();
+  await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.locator('.screen.active .import-entry').click();
   const now=new Date(),day=(now.getDay()+6)%7+1,first=new Date(now);first.setDate(now.getDate()-day+1);
   const date=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const value={term:{name:'真机自动化验证',startDate:date(first),weeks:20},courses:[{name:'海豚真机测试课',teacher:'测试教师',room:'测试楼 A101',day,start:1,end:2,weeks:[1,2,3],color:'sage'}]};
-  await page.getByRole('textbox',{name:'课表内容',exact:true}).fill(JSON.stringify(value));await page.getByRole('button',{name:'解析并预览',exact:true}).click();await page.getByRole('button',{name:'确认导入',exact:true}).click();await page.locator('.screen.active .course-card').waitFor();pass('真机 JSON 导入 → IndexedDB → 主页课程');
+  await pasteJSON(page);await page.getByRole('textbox',{name:'课表内容',exact:true}).fill(JSON.stringify(value));await page.getByRole('button',{name:'解析并预览',exact:true}).click();await page.getByRole('button',{name:'确认导入',exact:true}).click();await page.locator('.screen.active .course-card').waitFor();pass('真机 JSON 导入 → IndexedDB → 主页课程');
   const insets=await page.evaluate(()=>({top:getComputedStyle(document.documentElement).getPropertyValue('--native-top'),bottom:getComputedStyle(document.documentElement).getPropertyValue('--native-bottom'),dock:document.querySelector('.dock').getBoundingClientRect().bottom,height:innerHeight}));
   assert.ok(parseFloat(insets.top)>0);assert.ok(parseFloat(insets.bottom)>0);assert.ok(insets.dock<insets.height);report.insets=insets;pass('原生上/下安全区注入并避开手势条');
   await page.screenshot({path:'build/evidence/device-home.png'});
   await page.locator('.screen.active .course-card').click();await page.getByRole('button',{name:'手动填写',exact:true}).click();await page.locator('dialog[open]').waitFor();
   adb('shell','input','keyevent','4');await sleep(450);assert.equal(await page.locator('dialog[open]').count(),0);assert.equal(await page.locator('.course-sheet').count(),1);pass('返回键只关闭最上层教材对话框');
   adb('shell','input','keyevent','4');await sleep(450);assert.equal(await page.locator('.course-sheet').count(),0);pass('再次返回关闭详情，主页保留');
-  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="appearance"]').click();await sleep(450);
+  await goTab(page,'设置');await page.locator('[data-setting="appearance"]').click();await sleep(450);
   const before=await page.evaluate(()=>window.dolphinMetrics.backCallbacks);
   await page.evaluate(()=>{window.__frameTimes=[];let prev=performance.now();window.__sampling=true;function frame(t){if(document.documentElement.classList.contains('gesturing'))window.__frameTimes.push(t-prev);prev=t;if(window.__sampling)requestAnimationFrame(frame);}requestAnimationFrame(frame);});
   await new Promise((resolve,reject)=>{const child=spawn('adb',['shell','input','swipe','8','1400','800','1400','500']);child.on('exit',code=>code===0?resolve():reject(new Error('ADB swipe failed')));});

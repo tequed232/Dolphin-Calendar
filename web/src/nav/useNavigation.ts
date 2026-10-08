@@ -1,11 +1,14 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {native} from '../lib/native';
-export type Tab='home'|'search'|'settings';
-export type Route='home-settings'|'holidays'|'editor'|'import'|'books'|'appearance'|'background'|'notifications'|'safe-area'|'navigation'|'about'|'updates'|'calendar'|'interface';
+export const TABS=['list','grid','search','settings'] as const;
+export type Tab=typeof TABS[number];
+export type Route='home-settings'|'holidays'|'editor'|'import'|'books'|'appearance'|'background'|'notifications'|'safe-area'|'navigation'|'about'|'updates'|'calendar'|'interface'|'times'|'schedule-settings'|'data';
 function requestLeave(proceed:()=>void){const event=new CustomEvent('dolphin-leave-page',{cancelable:true,detail:proceed});const allowed=window.dispatchEvent(event);if(allowed)proceed();return allowed;}
-export function useNavigation(overlayBack:()=>boolean,hasOverlay:boolean){
-  const [tab,setTab]=useState<Tab>('home'),[stack,setStack]=useState<Route[]>([]),[returning,setReturning]=useState(false);
+export function useNavigation(overlayBack:()=>boolean,hasOverlay:boolean,initialTab?:Tab){
+  const [tab,setTab]=useState<Tab>('list'),[stack,setStack]=useState<Route[]>([]),[returning,setReturning]=useState(false);
   const state=useRef({stack,tab,hasOverlay,overlayBack});state.current={stack,tab,hasOverlay,overlayBack};
+  const initialized=useRef(false);
+  useLayoutEffect(()=>{if(initialTab&&!initialized.current){initialized.current=true;setTab(initialTab);}},[initialTab]);
   const lastBack=useRef(0),busy=useRef(false),generation=useRef(0),pendingPop=useRef(false);
   const animations=useRef<Animation[]>([]);
   const layers=useRef<{current:HTMLElement|null;previous:HTMLElement|null}>({current:null,previous:null});
@@ -76,5 +79,5 @@ export function useNavigation(overlayBack:()=>boolean,hasOverlay:boolean){
     const key=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!document.querySelector('dialog[open]'))back();};window.addEventListener('keydown',key);
     return()=>{delete window.dolphinBack;window.removeEventListener('keydown',key);clean();};
   },[]);
-  return {tab,stack,returning,back,push:(route:Route)=>{if(!busy.current&&state.current.stack.at(-1)!==route)requestLeave(()=>setStack(s=>s.at(-1)===route?s:[...s,route]));},select:(next:Tab)=>requestLeave(()=>{clean();setReturning(false);setStack([]);setTab(next);})};
+  return {tab,stack,returning,back,push:(route:Route)=>{if(!busy.current&&state.current.stack.at(-1)!==route)requestLeave(()=>setStack(s=>s.at(-1)===route?s:[...s,route]));},finish:()=>{clean();setReturning(false);setStack(s=>s.slice(0,-1));},select:(next:Tab,onAccepted?:()=>void)=>{if(next===state.current.tab&&!state.current.stack.length)return true;return requestLeave(()=>{onAccepted?.();clean();setReturning(false);setStack([]);setTab(next);});}};
 }

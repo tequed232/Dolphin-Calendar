@@ -1,4 +1,6 @@
 // 图标在构建时内联，只包含已选子集；首启不依赖网络或字体加载。
+import list from '../assets/icons/list.svg?raw';
+import grid from '../assets/icons/grid.svg?raw';
 import home from '../assets/icons/home.svg?raw';
 import search from '../assets/icons/search.svg?raw';
 import settings from '../assets/icons/settings.svg?raw';
@@ -27,7 +29,7 @@ import trash from '../assets/icons/trash.svg?raw';
 import today from '../assets/icons/today.svg?raw';
 import navigate from '../assets/icons/navigate.svg?raw';
 import brand from '../assets/brand/app-icon.png';
-const sources={home,search,settings,back,next,add,close,calendar,book,pin,camera,image,edit,upload,sun,bell,shield,info,check,copy,download,chevron,clock,spark,trash,today,navigate};
+const sources={list,grid,home,search,settings,back,next,add,close,calendar,book,pin,camera,image,edit,upload,sun,bell,shield,info,check,copy,download,chevron,clock,spark,trash,today,navigate};
 export type IconName=keyof typeof sources|'dolphin';
 const icons=Object.fromEntries(Object.entries(sources).map(([name,svg])=>[name,{viewBox:svg.match(/viewBox="([^"]+)"/)![1],body:svg.replace(/^<svg[^>]*>/,'').replace(/<\/svg>\s*$/,'')}])) as Record<keyof typeof sources,{viewBox:string;body:string}>;
 export function Icon({name,size=22}:{name:IconName;size?:number}){if(name==='dolphin')return <img className="brand-art" src={brand} width={size} height={size} alt="" aria-hidden="true"/>;const icon=icons[name];return <svg width={size} height={size} viewBox={icon.viewBox} fill="currentColor" aria-hidden="true" data-icon={name} dangerouslySetInnerHTML={{__html:icon.body}}/>;}

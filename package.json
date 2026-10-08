@@ -1,6 +1,6 @@
 {
   "name": "dolphin-calendar",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,13 +10,14 @@
     "check": "node scripts/verify.mjs",
     "check:source-files": "node scripts/check-source-files.mjs",
     "hooks:install": "git config --local core.hooksPath .githooks",
-    "test": "node --import tsx --test scripts/check-import.test.ts",
+    "test": "node --import tsx --test scripts/check-import.test.ts scripts/check-schedule.test.ts",
     "check:ui": "node scripts/check-ui.mjs",
     "android": "powershell -ExecutionPolicy Bypass -File scripts/android.ps1",
     "deliver": "pwsh -NoProfile -File scripts/deliver.ps1",
     "build:pages": "node scripts/build-pages.mjs"
   },
   "dependencies": {
+    "@e965/xlsx": "0.20.3",
     "react": "19.1.1",
     "react-dom": "19.1.1"
   },

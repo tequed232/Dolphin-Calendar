@@ -1,3 +1,4 @@
+import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
@@ -41,7 +42,7 @@ try{
     const closed=await measure();assert.ok(Math.abs(closed.dock.y-before.dock.y)<1);assert.ok(Math.abs(closed.host.height-before.host.height)<1);
     report.measurements.push({label,before,open,closed});report.checks.push(label);console.log('PASS '+label);
   }
-  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="editor"]').click();await page.locator('.screen.active .import-entry').click();
+  await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.locator('.screen.active .import-entry').click();
   const text=page.getByRole('textbox',{name:'课表内容',exact:true});
   await keyboardCase('JSON 输入时 Dock 固定、输入框可见、收起后恢复',text,'keyboard-import');
   await text.fill(JSON.stringify({term:{startDate:'2026-09-01'},courses:[{name:'键盘验证课程',day:1,start:1,end:2,weeks:[1],room:'16栋203号教室'}]}));
@@ -49,10 +50,10 @@ try{
   await page.locator('dialog[open]').filter({hasText:'确认这份课表'}).waitFor();
   await keyboardCase('导入预览弹窗输入保持可见且未丢失焦点',page.getByRole('textbox',{name:'学校名称（导航到楼栋时使用）',exact:true}),'keyboard-dialog');
   await page.getByRole('button',{name:'关闭对话框',exact:true}).click();await text.fill('');
-  await page.getByRole('button',{name:'设置',exact:true}).click();await page.locator('[data-setting="notifications"]').click();
+  await goTab(page,'设置');await page.locator('[data-setting="notifications"]').click();
   await page.getByRole('button',{name:/台词管理/}).click();
   await keyboardCase('页面下部台词输入滚到键盘上方，Dock 仍固定',page.getByRole('textbox',{name:'第 1 句台词',exact:true}),'keyboard-lyrics');
-  await page.getByRole('button',{name:'首页',exact:true}).click();
+  await goTab(page,'列表');
   report.completed=true;
 }finally{
   if(page){await page.evaluate(()=>{const active=document.activeElement;if(active instanceof HTMLElement)active.blur();}).catch(()=>{});await page.reload().catch(()=>{});}

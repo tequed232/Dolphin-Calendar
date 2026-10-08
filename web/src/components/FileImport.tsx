@@ -1,0 +1,27 @@
+import {useEffect,useRef,useState} from 'react';
+import {Dialog} from './Dialog';
+import {parseFileSource,readScheduleFile,type FileSource,type Mapping,type ImportResult,FileFormatError,IMPORT_FORMATS,type FileFormat} from '../lib/fileImport';
+import {ChoiceSelect} from './ChoiceSelect';
+import {ImportSteps} from './ImportSteps';
+import {useApp} from '../state/AppState';
+import type {Schedule} from '../lib/model';
+export function FileImport({file,open,onClose,onChooseFile,onPreview,onStage}:{file:File;open:boolean;onClose:()=>void;onChooseFile:()=>void;onPreview:(schedule:Schedule,source:string,format:FileFormat)=>void;onStage:(stage:number)=>void}){
+ const {data}=useApp(),[source,setSource]=useState<FileSource|null>(null),[index,setIndex]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(true),[manual,setManual]=useState(false),[result,setResult]=useState<ImportResult|null>(null);
+ const [formatIssue,setFormatIssue]=useState(false),[override,setOverride]=useState<FileFormat>('json');
+ const [mapping,setMapping]=useState<Mapping>({dayRow:0,sectionColumn:0,firstRow:1,lastRow:20,firstColumn:1,lastColumn:7});
+ // Cancel stale reads when the selection changes or the importer closes.
+ const token=useRef(0);
+ const onlyConfiguration=result?.schedule.importNotes?.some(note=>note.startsWith('文件仅更新课表配置'));
+ function analyze(value:FileSource,sheetIndex:number,map?:Mapping,autoPreview=false){try{onStage(2);const parsed=parseFileSource(value,data.schedule,sheetIndex,map);setResult(parsed);setError('');if(autoPreview&&!parsed.errors.length)onPreview(parsed.schedule,file.name,value.format);}catch(e){setResult(null);setError((e as Error).message);}}
+ async function read(value:File,format?:FileFormat){const generation=++token.current;setBusy(true);setResult(null);setSource(null);setError('');setManual(false);setFormatIssue(false);onStage(1);try{const next=await readScheduleFile(value,format);if(generation!==token.current)return;setSource(next);onStage(2);setIndex(0);if(next.sheets[0])setMapping(m=>({...m,lastRow:next.sheets[0].rows.length-1,lastColumn:Math.max(0,...next.sheets[0].rows.map(r=>r.length-1))}));if(next.sheets.length<=1)analyze(next,0,undefined,true);}catch(e){if(generation===token.current){setError((e as Error).message);if(e instanceof FileFormatError){setFormatIssue(true);setOverride(e.suggested??'json');}}}finally{if(generation===token.current)setBusy(false);}}
+ useEffect(()=>{void read(file);return()=>{token.current++;};},[file]);
+ return <>{open&&busy&&<div role="status" className="import-reading-status"><span>正在识别并解析 {file.name}…</span><button className="text-button" aria-label="取消读取" onClick={onClose}>取消</button></div>}<Dialog open={open&&!busy} title="读取课表" onClose={onClose}>
+  <ImportSteps stage={source?2:1}/><p className="import-source-name">{file.name}</p>{source&&<p className="hint">已识别格式：{source.format==='excel'?'Excel':source.format.toUpperCase()}</p>}
+  {source&&source.sheets.length>1&&<label className="field">选择工作表<select aria-label="选择工作表" value={index} onChange={e=>{const i=Number(e.target.value);setIndex(i);setManual(false);analyze(source,i);setMapping(m=>({...m,lastRow:source.sheets[i].rows.length-1,lastColumn:Math.max(0,...source.sheets[i].rows.map(r=>r.length-1))}));}}>{source.sheets.map((sheet,i)=><option value={i} key={i}>{sheet.name}</option>)}</select></label>}
+  {source&&source.format!=='json'&&<><button className="text-button" onClick={()=>setManual(v=>!v)}>手动映射</button>{manual&&<div className="mapping-form"><p className="hint">行列从 1 开始，选择星期、节次和课程区域。</p><div className="form-grid">{Object.entries({dayRow:'星期所在行',sectionColumn:'节次所在列',firstRow:'课程起始行',lastRow:'课程结束行',firstColumn:'课程起始列',lastColumn:'课程结束列'}).map(([key,label])=><label className="field" key={key}>{label}<input type="number" min={1} value={mapping[key as keyof Mapping]+1} onChange={e=>setMapping(m=>({...m,[key]:Number(e.target.value)-1}))}/></label>)}</div><button className="secondary" onClick={()=>analyze(source,index,mapping)}>重新解析</button><div className="sheet-sample">{source.sheets[index].rows.slice(0,8).map((row,i)=><p key={i}><b>{i+1}</b> {row.slice(0,8).join(' ｜ ')}</p>)}</div></div>}</>}
+  {formatIssue&&<><ChoiceSelect label="指定文件格式" value={override} options={IMPORT_FORMATS.map(option=>({value:option.value,label:option.label}))} onChange={value=>setOverride(value as FileFormat)}/><button className="primary full" disabled={busy} onClick={()=>void read(file,override)}>按此格式继续</button></>}{error&&<p role="alert" className="field-error">{error}</p>}
+  {result&&<><p className="import-preview-summary"><strong>{onlyConfiguration?`读取到 ${result.schedule.periods.length} 节时间配置`:`识别到 ${new Set(result.schedule.courses.map(c=>c.name)).size} 门课程`}</strong><span>{onlyConfiguration?`已有 ${result.schedule.courses.length} 门课程保留`:`${result.blocks} 个课程块 · 每天 ${result.schedule.periods.length} 节 · 周${result.days.map(d=>'一二三四五六日'[d-1]).join('、')}`}</span></p>{result.errors.length>0&&<details><summary>跳过 {result.errors.length} 项，查看明细</summary>{result.errors.map((e,i)=><p className="field-error" key={i}>{e}</p>)}</details>}<button className="primary full" onClick={()=>onPreview(result.schedule,file.name,source!.format)}>查看导入预览</button></>}
+  {source&&source.sheets.length>1&&!result&&!error&&<button className="primary" onClick={()=>analyze(source,index)}>解析此工作表</button>}
+  <div className="button-row import-reader-actions"><button className="secondary" onClick={onChooseFile}>重新选择文件</button><button className="text-button" onClick={onClose}>取消</button></div>
+ </Dialog></>;
+}
