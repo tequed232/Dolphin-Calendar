@@ -10,7 +10,6 @@ import {exportText} from '../lib/export';
 import {ScheduleSettings} from '../components/ScheduleSettings';
 import {APP_VERSION,GITHUB_PROFILE_URL} from '../meta';
 import {isNative,native} from '../lib/native';
-import {SHOW_GLASS_MODE_SETTINGS} from '../lib/features';
 import type {Course,Settings as Preferences} from '../lib/model';
 import type {Route} from '../nav/useNavigation';
 export const SETTINGS_GROUPS:{title:string;route:Route;description:string;icon:IconName}[]=[
@@ -55,16 +54,11 @@ export function SettingsPage({route,push,editCourse,openCourse,showIntro}:{route
   if(route==='data')return <md-card className="form-card"><h2>本机数据</h2><p>{data.schedule.courses.length} 个课程块 · {Object.keys(data.books).length} 本教材</p><p>课表、教材、外观和偏好保存在当前设备的 IndexedDB 中。课表数据只有一份，应用设置不会保存另一份课表配置。</p><p className="hint">课表 JSON 包含开学日期、学期周数、节次时间和全部课程；不包含教材封面、背景或应用偏好。卸载应用或清除浏览器数据会删除本机内容。</p><LinkRow title="导出课表 JSON" detail="保存当前课表及其配置" onClick={()=>exportText(`dolphin-calendar-${APP_VERSION}.json`,JSON.stringify(data.schedule,null,2))} icon="download"/><LinkRow title="从课表文件恢复" detail="复用统一导入流程，预览后确认" onClick={()=>push('import')} icon="upload"/></md-card>;
   if(route==='books')return <>{Object.entries(data.books).map(([name,b])=><md-card key={name} className="library-book"><div className="book-card">{b.cover?<img src={b.cover} alt={b.title+'封面'}/>:<div className="book-placeholder"><Icon name="book"/></div>}<div><strong>{b.title}</strong><p>{b.publisher||'出版社未填写'}</p><small>{b.edition||'版次未填写'} · {name}</small></div></div><button className="text-button" onClick={()=>{const c=data.schedule.courses.find(c=>c.name===name);if(c)openCourse(c);else toast('当前课表中没有这门课；教材仍保留在本机');}}>查看课程</button></md-card>)}{!Object.keys(data.books).length&&<div className="empty-card"><Icon name="book" size={36}/><h3>你的随身小书架</h3><p>打开课程详情，即可选择封面、填写书名和版次。</p><button className="primary" onClick={()=>push("editor")}>前往课表管理</button></div>}</>;
   if(route==='appearance')return <>
-    <p className="page-purpose">调整背景、文字尺寸和底栏质感，让界面清楚又合心意。选项会即时保存。</p>
+    <p className="page-purpose">调整背景、文字尺寸和显示布局，让界面清楚又合心意。竖屏使用底部导航，横屏和宽屏使用侧边导航。选项会即时保存。</p>
     <md-card className="form-card"><LinkRow title="背景" detail={data.background&&s.backgroundEnabled?'自定义图片 · 更换图片或调节背景毛玻璃':'默认背景 · 选择图片并调节毛玻璃'} onClick={()=>push('background')} icon="image"/></md-card>
     <h2 className="subheading">显示与布局</h2>
     <md-card className="form-card"><Select label="深浅模式" value={s.mode} onChange={v=>set('mode',v as Preferences['mode'])}><option value="system">跟随系统</option><option value="light">浅色 · 晴日</option><option value="dark">深色 · 夜航</option></Select><Select label="界面缩放" value={s.scale} onChange={v=>set('scale',Number(v))}>{[.85,.9,1,1.05,1.1].map(v=><option key={v} value={v}>{Math.round(v*100)}%{v===1?' · 默认':''}</option>)}</Select><Toggle id="show-current-time-line" label="当前时间线" description="在今天的列表和本周的平铺课表中显示" value={s.showCurrentTimeLine!==false} onChange={v=>set('showCurrentTimeLine',v)}/><LinkRow title="屏幕安全区" detail="让顶部内容和底栏避开状态栏、屏幕切口与手势区" onClick={()=>push('safe-area')}/></md-card>
-    {(SHOW_GLASS_MODE_SETTINGS||s.glassMode!=='off')&&<>
-      <h2 className="subheading">{SHOW_GLASS_MODE_SETTINGS?'液态玻璃':'底栏质感'}</h2>
-      <p className="section-purpose">{SHOW_GLASS_MODE_SETTINGS?'选择底栏的透镜效果，或让卡片、按钮与弹窗也使用玻璃质感。背景图片的毛玻璃在“背景”中单独调节。':'调节底栏的边缘光泽、散射与扭曲。背景图片的毛玻璃在“背景”中单独调节。'}</p>
-      <md-card className="form-card">{SHOW_GLASS_MODE_SETTINGS&&<><Select label="液态玻璃模式" value={s.glassMode} onChange={value=>{void update(d=>({...d,settings:{...d.settings,glassMode:value as Preferences['glassMode'],glass:value!=='off'}})).catch(()=>{});}}><option value="off">关闭 · 纯色界面</option><option value="partial">部分 · 底栏</option><option value="full">完全 · 全界面</option></Select><p className="hint glass-mode-description">{s.glassMode==='off'?'保留底栏的滑动与弹性选择，使用清楚的纯色表面。':s.glassMode==='full'?'底栏保留透镜，其他界面使用半透明、高光与轻度模糊；文字和主要操作保持清晰。':'仅底栏使用实时透镜；课程卡片和设置保持清楚的纯色表面。'}</p></>}{s.glassMode!=='off'&&([{key:'dispersion',label:'底栏边缘光泽',descs:['关闭 · 清晰边缘','轻微 · 柔和高光','明显 · 增强边缘光泽']},{key:'scattering',label:'底栏散射',descs:['关闭 · 透明轮廓','柔和 · 背景轻度模糊','弥散 · 背景深度模糊']},{key:'distortion',label:'底栏扭曲',descs:['关闭 · 保持背景原貌','轻微 · 轻折射','明显 · 更强的背景折射']} ] as const).map(v=><Select key={v.key} label={v.label} value={s[v.key]} onChange={n=>set(v.key,Number(n))}>{v.descs.map((t,i)=><option key={i} value={i}>{t}</option>)}</Select>)}</md-card>
-    </>}
-    <md-card className="form-card"><Select label="性能模式" value={s.performance} onChange={v=>set('performance',v as Preferences['performance'])}><option value="auto">自动 · 优先流畅，必要时减少滤镜</option><option value="high">完整效果 · 耗能较高</option></Select></md-card><p className="hint">自动模式会在交互不够流畅时降低折射和模糊处理，滑动与弹性选择继续可用。实际帧率受设备与省电设置影响。</p>
+    <md-card className="form-card"><Select label="性能模式" value={s.performance} onChange={v=>set('performance',v as Preferences['performance'])}><option value="auto">自动 · 优先流畅，必要时减少滤镜</option><option value="high">完整效果 · 耗能较高</option></Select></md-card><p className="hint">自动模式会在交互不够流畅时减少界面滤镜。导航使用清晰的实体表面，实际帧率受设备与省电设置影响。</p>
   </>;
   if(route==='background')return <Background/>;
   if(route==='notifications')return <>

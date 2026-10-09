@@ -20,7 +20,7 @@ export function Background(){
     <p className="page-purpose">给日常换一张背景。图片固定在底层，卡片和按钮保持清楚。</p>
     <md-card className="form-card background-card">
       <div className="background-preview" aria-label="背景效果预览">
-        <div className="preview-photo" style={{backgroundImage:`url("${url}")`,filter:`blur(${blur}px)`}}/><div className="preview-frost"/><div className="preview-content"><span>背景预览</span><strong>今天</strong><p>让日常，合你的心意。</p><div><Icon name="calendar" size={17}/><span>课程与安排</span></div><div className="preview-dock"><Icon name="home" size={17}/><Icon name="search" size={17}/><Icon name="settings" size={17}/></div></div>
+        <div className="preview-photo" style={{backgroundImage:`url("${url}")`,filter:`blur(${blur}px)`}}/><div className="preview-frost"/><div className="preview-content"><span>背景预览</span><strong>今天</strong><p>让日常，合你的心意。</p><div><Icon name="calendar" size={17}/><span>课程与安排</span></div><div className="preview-navigation"><Icon name="list" size={17}/><Icon name="grid" size={17}/><Icon name="search" size={17}/><Icon name="settings" size={17}/></div></div>
       </div>
       <div className="background-status"><strong>{active?'正在使用自定义图片':'正在使用默认背景'}</strong><small>{active?`${photo.name} · 原图 ${photo.sourceWidth}×${photo.sourceHeight}`:'内置插画 · 可直接调节毛玻璃。'}{photo&&!active&&` 已选图片“${photo.name}”仍保留，可重新启用。`}</small></div>
       <label className={`primary full file-button ${busy?'is-disabled':''}`}><Icon name="image" size={19}/>{busy?'正在处理图片…':photo?'更换背景图片':'选择背景图片'}<input type="file" aria-label="选择背景图片" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={e=>{void choose(e.target.files?.[0]);e.target.value='';}}/></label>

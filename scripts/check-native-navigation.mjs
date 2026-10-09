@@ -1,0 +1,159 @@
+/** Actual Android navigation audit on an isolated emulator; never uninstall or clear app data. */
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import path from 'node:path';
+import {_android} from 'playwright';
+
+const args=Object.fromEntries(process.argv.slice(2).reduce((pairs,item,index,all)=>{if(item.startsWith('--'))pairs.push([item.slice(2),all[index+1]?.startsWith('--')?true:all[index+1]??true]);return pairs;},[]));
+const serial=args.serial??'emulator-5562',pkg=args.package??'com.dolphin.calendar',cdp=Boolean(args.cdp);
+assert.match(serial,/^emulator-\d+$/,'Only the task emulator can be used');
+assert.ok(['com.dolphin.calendar','com.dolphin.calendar.debug'].includes(pkg));
+assert.ok(!cdp||pkg.endsWith('.debug'),'CDP is only available on the isolated debug package');
+assert.ok(!args.seed||(cdp&&pkg.endsWith('.debug')),'Seeding is limited to a fresh isolated debug package');
+const adbPath=args.adb??path.join(process.env.ANDROID_HOME??'D:/Android/Sdk','platform-tools',process.platform==='win32'?'adb.exe':'adb');
+const prefix=args.prefix??'1.4.5-native',course=args.course??'RetainedCourse10403';
+const output=path.resolve('build/evidence');mkdirSync(output,{recursive:true});
+const run=(...command)=>execFileSync(adbPath,['-s',serial,...command],{encoding:'utf8',timeout:60000,maxBuffer:4*1024*1024}).trim();
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const decode=s=>s.replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&#10;/g,'\n').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+const label=n=>n.text||n['content-desc']||'';
+const bounds=n=>n.bounds.match(/\d+/g).map(Number);
+const visible=n=>n.bounds&&n.bounds!=='[0,0][0,0]';
+let xml='',device,page,firstError;
+function parse(tree){
+  const parents=[],nodes=[];
+  for(const token of tree.matchAll(/<\/?node\b[^>]*>/g)){
+    if(token[0].startsWith('</')){parents.pop();continue;}
+    const node=Object.fromEntries(Array.from(token[0].matchAll(/([\w-]+)="([^"]*)"/g),m=>[m[1],decode(m[2])]));
+    node.inWebView=parents.includes('android.webkit.WebView');nodes.push(node);
+    if(!token[0].endsWith('/>'))parents.push(node.class);
+  }
+  return nodes;
+}
+function dump(){
+  const result=run('shell','uiautomator','dump','/sdcard/dolphin-native-audit.xml');
+  if(!result.includes('dumped to:'))return [];
+  xml=run('shell','cat','/sdcard/dolphin-native-audit.xml');return parse(xml);
+}
+const destinations=['列表','平铺','搜索','设置'];
+const nativeButtons=ui=>ui.filter(n=>!n.inWebView&&n.class==='android.widget.Button'&&n.clickable==='true'&&destinations.includes(n['content-desc'])&&!n.text&&visible(n));
+const imeShown=()=>/mInputShown=true/.test(run('shell','dumpsys','input_method'));
+async function waitFor(predicate,reason){for(let attempt=0;attempt<15;attempt++){const ui=dump();if(predicate(ui))return ui;await sleep(400);}throw Error(reason);}
+function tap(node){assert.ok(node&&visible(node),'Expected a visible Android control');const b=bounds(node);run('shell','input','tap',String(Math.round((b[0]+b[2])/2)),String(Math.round((b[1]+b[3])/2)));}
+async function select(text,content){
+  let ui=await waitFor(ui=>nativeButtons(ui).length===4,'Native navigation did not appear');tap(nativeButtons(ui).find(n=>n['content-desc']===text));
+  ui=await waitFor(ui=>nativeButtons(ui).some(n=>n['content-desc']===text&&n.selected==='true'),'Native selection did not receive Web confirmation');
+  // Existing list/grid focus restoration may return midway through a page; scroll to its heading for proof.
+  for(let attempt=0;content&&!ui.some(n=>content(n)&&visible(n))&&attempt<6;attempt++){
+    const b=bounds(ui.find(n=>n.class==='android.webkit.WebView'&&visible(n))),x=Math.round((b[0]+b[2])*0.6),height=b[3]-b[1];
+    run('shell','input','swipe',String(x),String(Math.round(b[1]+height*.2)),String(x),String(Math.round(b[1]+height*.8)),'350');ui=dump();
+  }
+  assert.ok(!content||ui.some(n=>content(n)&&visible(n)),'Web page content did not match the native selected destination');
+  if(page)assert.equal(await page.locator('.tab-screen.active').getAttribute('data-screen'),({列表:'list',平铺:'grid',搜索:'search',设置:'settings'})[text]);
+  return ui;
+}
+async function editorBack(){
+  if(imeShown()){run('shell','input','keyevent','4');await waitFor(()=>!imeShown(),'Keyboard Back must dismiss the IME');}
+  run('shell','input','keyevent','4');
+  return waitFor(ui=>ui.some(n=>n.text==='放弃修改'&&n.class==='android.widget.Button'&&visible(n))&&nativeButtons(ui).length===0,'Unsaved course draft must stay guarded on Android Back');
+}
+function capture(name){writeFileSync(path.join(output,`${prefix}-${name}.xml`),xml);run('shell','screencap','-p','/sdcard/dolphin-native-audit.png');run('pull','/sdcard/dolphin-native-audit.png',path.join(output,`${prefix}-${name}.png`));}
+function rotate(value){run('shell','settings','put','system','accelerometer_rotation','0');run('shell','settings','put','system','user_rotation',String(value));}
+const rotation={auto:run('shell','settings','get','system','accelerometer_rotation'),user:run('shell','settings','get','system','user_rotation')};
+const density=Number(run('shell','wm','density').match(/(?:Override|Physical) density:\s*(\d+)/g)?.at(-1)?.match(/\d+/)?.[0])/160;
+assert.ok(density>0);
+const report={at:new Date().toISOString(),serial,pkg,cdp,density,scope:'Task emulator only; UI input drafts are discarded; app is never uninstalled or cleared; original rotation settings are restored.',checks:[],geometry:{},status:'running'};
+if(args.apk)report.apkSHA256=createHash('sha256').update(readFileSync(args.apk)).digest('hex');
+const installedPath=run('shell','pm','path',pkg).split('\n').find(line=>line.startsWith('package:'))?.slice(8);
+assert.ok(installedPath,'Audited app must already be installed');
+report.installedApkSHA256=run('shell','sha256sum',installedPath).split(/\s+/)[0];
+if(args.apk)assert.equal(report.installedApkSHA256,report.apkSHA256,'UI audit must operate on the exact supplied APK');
+const pass=name=>{report.checks.push(name);console.log('PASS '+name);};
+async function webGeometry(layout,ui){
+  if(!page)return;
+  await page.waitForFunction(layout=>document.documentElement.dataset.navigationLayout===layout&&document.documentElement.dataset.nativeNavigation==='true',layout);
+  const metrics=await page.evaluate(()=>{
+    const root=document.documentElement,host=document.querySelector('.screen-host'),rect=host.getBoundingClientRect();
+    return {screen:{left:rect.left,right:rect.right,bottom:rect.bottom},height:innerHeight,width:innerWidth,left:Number.parseFloat(root.style.getPropertyValue('--native-navigation-left')),right:Number.parseFloat(root.style.getPropertyValue('--native-navigation-right')),bottom:Number.parseFloat(root.style.getPropertyValue('--native-navigation-bottom')),webNavigation:document.querySelectorAll('.primary-navigation').length};
+  });
+  assert.equal(metrics.webNavigation,0,'Confirmed Android capability must remove Web navigation');
+  const items=nativeButtons(ui),first=bounds(items[0]);
+  if(layout==='bottom'){assert.ok(Math.abs(metrics.screen.bottom-first[1]/density)<2,'Web content must stop at the native bar');assert.ok(metrics.bottom>=80);}
+  else {assert.ok(Math.abs(metrics.screen.left-first[2]/density)<2,'Web content must begin after the native rail');assert.ok(metrics.left>=88);}
+  report.geometry[`${layout}Web`]=metrics;pass(`${layout} native occupancy matches actual WebView content bounds; no duplicate Web bar`);
+}
+async function actualSwipe(selector,direction){
+  const region=page.locator(selector);await region.scrollIntoViewIfNeeded();const box=await region.boundingBox();assert.ok(box);
+  const from=box.x+box.width*(direction==='left'?.82:.18),to=box.x+box.width*(direction==='left'?.18:.82),y=box.y+box.height*.5;
+  run('shell','input','swipe',String(Math.round(from*density)),String(Math.round(y*density)),String(Math.round(to*density)),String(Math.round(y*density)),'320');
+  // Wait for the picker to complete its 200 ms page settlement before a second physical gesture.
+  await sleep(300);
+}
+try{
+  rotate(0);run('shell','am','force-stop',pkg);run('shell','am','start','-n',`${pkg}/com.dolphin.calendar.MainActivity`);
+  if(cdp){
+    device=(await _android.devices()).find(d=>d.serial()===serial);assert.ok(device);page=await(await device.webView({pkg})).page();await page.locator('.load-note').waitFor({state:'hidden'});
+    if(args.seed){
+      await page.waitForFunction(()=>document.querySelector('dialog[open] .onboarding')||document.querySelector('.app-shell[data-navigation-visible=true]'));
+      const savedCount=await page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('dolphin-calendar',1);request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,read=db.transaction('state').objectStore('state').get('app');read.onerror=()=>reject(read.error);read.onsuccess=()=>{resolve(read.result?.schedule?.courses?.length??0);db.close();};};}));
+      assert.equal(savedCount,0,'Never replace existing debug courses while preparing a fixture');
+      const skip=page.getByRole('button',{name:'先逛一逛',exact:true});if(await skip.isVisible())await skip.click();
+      await page.getByRole('button',{name:'导入课表',exact:true}).click();await page.getByText('粘贴 JSON 内容',{exact:true}).click();
+      const fixture={term:{name:'NativeNavigationAudit10405',startDate:new Date().toISOString().slice(0,10),weeks:20},courses:[{name:course,teacher:'SyntheticTeacher',room:'2栋206号教室',day:4,start:3,end:4,weeks:Array.from({length:20},(_,index)=>index+1),notes:'Synthetic emulator fixture',color:'sage'}]};
+      await page.getByRole('textbox',{name:'课表内容',exact:true}).fill(JSON.stringify(fixture));await page.getByRole('button',{name:'解析并预览',exact:true}).click();await page.getByRole('button',{name:'确认导入',exact:true}).click();
+      report.fixture={method:'Actual JSON import UI on a fresh isolated debug package',...fixture};pass('Fresh debug fixture imports through the existing JSON preview/confirmation UI');
+    }
+  }
+  let ui=await waitFor(ui=>nativeButtons(ui).length===4,'Four actual Android navigation buttons are required');
+  const bottom=nativeButtons(ui).map(n=>({label:n['content-desc'],selected:n.selected,bounds:bounds(n)}));
+  assert.equal(bottom.filter(n=>n.selected==='true').length,1);
+  assert.ok(bottom.every(n=>Math.abs((n.bounds[3]-n.bounds[1])/density-80)<1&&((n.bounds[2]-n.bounds[0])/density)>=48));
+  assert.equal(new Set(bottom.map(n=>n.bounds[1])).size,1);report.geometry.bottom=bottom;capture('portrait');pass('Four real Android buttons outside WebView form an 80 dp bottom bar with one selected destination and ≥48 dp targets');
+  await webGeometry('bottom',ui);
+  ui=await select('搜索',n=>n.text==='查找整个课表中的课程、教师或教室。');capture('search-selected');pass('Native click updates Web destination and the confirmed native selected state');
+  const searchInput=ui.find(n=>n.class==='android.widget.EditText'&&/搜索课程|课程、教师或教室/.test(label(n)+' '+(n.hint??''))&&visible(n));tap(searchInput);
+  ui=await waitFor(ui=>nativeButtons(ui).length===0&&imeShown(),'IME must appear and native navigation must hide');report.imeEvidence=run('shell','dumpsys','input_method').split('\n').filter(line=>/mInputShown|mIsInputViewShown/.test(line)).map(line=>line.trim());capture('keyboard');
+  if(page)assert.equal(await page.evaluate(()=>document.documentElement.dataset.keyboard),'true');pass('Actual Android keyboard hides native navigation and its occupied band');
+  run('shell','input','keyevent','4');ui=await waitFor(ui=>nativeButtons(ui).length===4,'Native navigation must return after keyboard Back');pass('Keyboard Back restores navigation without leaving Search');
+  ui=await select('列表',n=>n.text==='选择日期');tap(ui.find(n=>n.text==='选择日期'&&n.class==='android.widget.Button'&&visible(n)));
+  ui=await waitFor(ui=>nativeButtons(ui).length===0&&ui.some(n=>n.text==='选择日期'&&n.class==='android.widget.TextView'&&visible(n)),'Calendar modal must hide native navigation');capture('calendar');pass('Calendar dialog hides native navigation and remains above page content');
+  if(page){
+    const monthButton=page.locator('.calendar-month'),initial=await monthButton.innerText(),match=initial.match(/(\d+)年(\d+)月/),year=Number(match[1]),month=Number(match[2]);
+    await actualSwipe('.calendar-viewport','left');assert.equal(await monthButton.innerText(),`${month===12?year+1:year}年${month===12?1:month+1}月`);
+    await actualSwipe('.calendar-viewport','right');assert.equal(await monthButton.innerText(),initial);pass('Physical Android month swipes change months in both directions without accidentally selecting a date');
+    await monthButton.click();const yearInput=page.getByLabel('日历年份',{exact:true}),initialYear=Number(await yearInput.inputValue());
+    await actualSwipe('.calendar-year-swipe','left');assert.equal(Number(await yearInput.inputValue()),initialYear+1);
+    await actualSwipe('.calendar-year-swipe','right');assert.equal(Number(await yearInput.inputValue()),initialYear);
+    ui=dump();assert.equal(nativeButtons(ui).length,0);capture('calendar-year-swiped');pass('Physical Android year-region swipes change years in both directions while native navigation stays hidden');
+  }
+  run('shell','input','keyevent','4');ui=await waitFor(ui=>nativeButtons(ui).length===4,'Calendar Back must return to the selected page');pass('Android Back dismisses the calendar and restores the selected page');
+  rotate(1);ui=await waitFor(ui=>{const nav=nativeButtons(ui);return nav.length===4&&new Set(nav.map(n=>bounds(n)[0])).size===1;},'Landscape must use a native side rail');
+  const rail=nativeButtons(ui).map(n=>({label:n['content-desc'],selected:n.selected,bounds:bounds(n)}));
+  assert.ok(rail.every(n=>Math.abs((n.bounds[2]-n.bounds[0])/density-88)<1&&(n.bounds[3]-n.bounds[1])/density>=48));
+  report.geometry.rail=rail;capture('landscape');pass('Landscape switches to a real 88 dp native rail with four accessible ≥48 dp destinations');await webGeometry('rail',ui);
+  for(const [text,heading] of [['平铺',n=>n.text==='平铺课表'||/^周[一二三四五六日]第\d+节添加临时课程$/.test(n.text)],['搜索',n=>n.text==='查找整个课表中的课程、教师或教室。'],['设置',n=>n.text==='管理课表，安排提醒，调整你的界面。'],['列表',n=>n.text==='选择日期']])await select(text,heading);
+  pass('All four native rail destinations open their existing pages');
+  rotate(0);ui=await waitFor(ui=>{const nav=nativeButtons(ui);return nav.length===4&&new Set(nav.map(n=>bounds(n)[1])).size===1;},'Portrait must restore bottom navigation');pass('Rotating back restores the bottom bar and selected page');
+  ui=await select('搜索',n=>n.text==='查找整个课表中的课程、教师或教室。');
+  tap(ui.find(n=>n.class==='android.widget.Button'&&n.text.includes(course)&&visible(n)));
+  ui=await waitFor(ui=>nativeButtons(ui).length===0&&ui.some(n=>n.text.includes(course+'详情')),'Course detail must hide native navigation');capture('course-detail');
+  for(let attempt=0;attempt<8&&!ui.some(n=>n.text==='编辑这门课程'&&n.clickable==='true'&&visible(n));attempt++){run('shell','input','swipe','540','1850','540','700','400');ui=dump();}
+  tap(ui.find(n=>n.text==='编辑这门课程'&&n.clickable==='true'&&visible(n)));
+  ui=await waitFor(ui=>nativeButtons(ui).length===0&&ui.some(n=>n.class==='android.widget.EditText'&&n.text===course&&visible(n)),'Course editor must keep native navigation hidden');capture('course-editor');
+  if(page){await page.locator('dialog[open]').getByLabel('课程名',{exact:true}).fill(course+'NativeUnsavedAudit');}
+  else {tap(ui.find(n=>n.class==='android.widget.EditText'&&n.text===course&&visible(n)));await waitFor(()=>imeShown(),'Tap must focus the course field and open the keyboard');run('shell','input','keyevent','123');run('shell','input','text','NativeUnsavedAudit');}
+  await waitFor(ui=>ui.some(n=>n.class==='android.widget.EditText'&&n.text.includes('NativeUnsavedAudit')&&visible(n)),'The test must actually change the unsaved course draft');
+  ui=await editorBack();capture('editor-back-guard');pass('Course editing hides navigation; Android Back preserves unsaved changes behind the existing discard guard');
+  tap(ui.find(n=>n.text==='继续编辑'&&n.class==='android.widget.Button'&&visible(n)));ui=await waitFor(ui=>ui.some(n=>n.class==='android.widget.EditText'&&n.text.includes('NativeUnsavedAudit')&&visible(n)),'Continue editing must preserve the draft');
+  ui=await editorBack();tap(ui.find(n=>n.text==='放弃修改'&&n.class==='android.widget.Button'&&visible(n)));
+  ui=await waitFor(ui=>nativeButtons(ui).length===4&&ui.some(n=>n.text.includes(course)&&!n.text.includes('NativeUnsavedAudit')&&visible(n)),'Discarding must restore navigation and the unchanged saved course');capture('editor-discarded');pass('Continue preserves the draft; discard returns to the native destination and leaves the saved synthetic course unchanged');
+  report.status='passed';
+}catch(error){firstError=error;report.status='failed';report.error=error.stack;}
+finally{
+  if(firstError&&xml)writeFileSync(path.join(output,`${prefix}-failure.xml`),xml);
+  for(const [key,value] of Object.entries({accelerometer_rotation:rotation.auto,user_rotation:rotation.user}))run('shell','settings',value==='null'?'delete':'put','system',key,...(value==='null'?[]:[value]));
+  await device?.close();run('shell','am','force-stop',pkg);report.rotationRestored=true;writeFileSync(path.join(output,`${prefix}-results.json`),JSON.stringify(report,null,2)+'\n');
+}
+if(firstError)throw firstError;

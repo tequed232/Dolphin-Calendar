@@ -17,10 +17,13 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.provider.Settings
 import android.view.HapticFeedbackConstants
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.VelocityTracker
+import android.view.View
 import android.view.WindowManager
 import android.webkit.*
+import android.widget.FrameLayout
 import android.window.BackEvent
 import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedDispatcher
@@ -35,6 +38,13 @@ import java.time.LocalDate
 
 class MainActivity : Activity() {
     private lateinit var web: EdgeWebView
+    private lateinit var content: FrameLayout
+    private lateinit var navigation: NativeNavigationView
+    private var navigationVisible = false
+    private var navigationLayout = "bottom"
+    private var navigationInsets = Rect()
+    private var navigationGeometry: String? = null
+    private var lastNavigationOccupancy: String? = null
     private var canGoBack = false
     private var pageReady = false
     private var topInset = 0f
@@ -62,7 +72,14 @@ class MainActivity : Activity() {
         window.attributes = window.attributes.apply { preferredRefreshRate = windowManager.defaultDisplay.supportedModes.maxOfOrNull { it.refreshRate } ?: 60f }
         web = EdgeWebView()
         web.setBackgroundColor(Color.rgb(247,247,247))
-        setContentView(web)
+        content = FrameLayout(this)
+        navigation = NativeNavigationView(this) { destination ->
+            // Web confirms the selection after applying its existing unsaved-edit/back guards.
+            send(JSONObject().put("type", "selectTab").put("value", destination))
+        }.apply { visibility = View.GONE }
+        content.addView(web, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        content.addView(navigation)
+        setContentView(content)
         stopObservingUpdates = AppUpdates.observe { updatesStatus() }
         with(web.settings) {
             javaScriptEnabled = true; domStorageEnabled = true
@@ -110,16 +127,18 @@ class MainActivity : Activity() {
                 return true
             }
         }
-        ViewCompat.setOnApplyWindowInsetsListener(web) { _, insets ->
+        ViewCompat.setOnApplyWindowInsetsListener(content) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
             val density = resources.displayMetrics.density
-            // 系统安全区固定到窗口边缘；键盘只让输入区域避让，不能推动 Dock。
+            // The WebView keeps full-window coordinates; native navigation reserves its own opaque band.
             topInset = bars.top / density; bottomInset = bars.bottom / density
             keyboardInset = if(insets.isVisible(WindowInsetsCompat.Type.ime())) ime.bottom / density else 0f
-            injectInsets(); updateGestureExclusion(); insets
+            navigationInsets.set(bars.left, bars.top, bars.right, bars.bottom)
+            injectInsets(); updateNativeNavigation(); updateGestureExclusion(); insets
         }
-        web.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> injectInsets(); updateGestureExclusion() }
+        content.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> injectInsets(); updateNativeNavigation(); updateGestureExclusion() }
+        content.post { ViewCompat.requestApplyInsets(content) }
         if(Build.VERSION.SDK_INT >= 34) onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, object : OnBackAnimationCallback {
             override fun onBackStarted(event: BackEvent) { systemPreview = canGoBack; if(canGoBack) backPhase("start", 0f, event.touchX / web.width, event.touchY / web.height) }
             override fun onBackProgressed(event: BackEvent) { if(canGoBack) backPhase("progress", event.progress) }
@@ -135,6 +154,47 @@ class MainActivity : Activity() {
         if(Build.VERSION.SDK_INT >= 30) fullWindowHeight = windowManager.currentWindowMetrics.bounds.height() / density
         else if(keyboardInset == 0f || fullWindowHeight == 0f) fullWindowHeight = window.decorView.height / density
         web.evaluateJavascript("window.dolphinInsets?.($topInset,$bottomInset,$keyboardInset,$fullWindowHeight)", null)
+    }
+    private fun updateNativeNavigation(force: Boolean = false) {
+        val density = resources.displayMetrics.density
+        val shown = pageReady && navigationVisible && keyboardInset == 0f
+        val rail = navigationLayout == "rail"
+        val insets = navigationInsets
+        val windowHeight = (fullWindowHeight * density).toInt().takeIf { it > 0 } ?: content.height
+        val geometry = "$rail:${insets.toShortString()}:$windowHeight:$density"
+        if(navigationGeometry != geometry) {
+            navigationGeometry = geometry
+            navigation.configureGeometry(rail, insets.left, insets.top, insets.right, insets.bottom, windowHeight)
+            navigation.layoutParams = if(rail) FrameLayout.LayoutParams(
+                (NativeNavigationView.RAIL_WIDTH_DP * density + .5f).toInt() + insets.left,
+                FrameLayout.LayoutParams.MATCH_PARENT, Gravity.LEFT
+            ) else FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                (NativeNavigationView.BAR_HEIGHT_DP * density + .5f).toInt() + insets.bottom, Gravity.BOTTOM
+            )
+        }
+        navigation.visibility = if(shown) View.VISIBLE else View.GONE
+        val left = insets.left / density + if(shown && rail) NativeNavigationView.RAIL_WIDTH_DP else 0
+        val bottom = if(shown && !rail) NativeNavigationView.BAR_HEIGHT_DP + insets.bottom / density else 0f
+        val right = insets.right / density
+        val occupancy = "$left:$bottom:$right"
+        if(force || lastNavigationOccupancy != occupancy) {
+            lastNavigationOccupancy = occupancy
+            send(JSONObject().put("type", "nativeNavigation").put("available", true)
+                .put("left", left).put("bottom", bottom).put("right", right))
+        }
+    }
+    private fun navigationState(data: JSONObject) {
+        val destination = data.optString("tab")
+        if(destination in NativeNavigationView.DESTINATIONS) navigation.select(destination)
+        navigationVisible = data.optBoolean("visible", false)
+        navigationLayout = if(data.optString("layout") == "rail") "rail" else "bottom"
+        fun color(key: String, fallback: Int) = runCatching { Color.parseColor(data.optString(key)) }.getOrDefault(fallback)
+        navigation.updateAppearance(
+            color("surface", Color.rgb(246, 247, 242)), color("accent", Color.rgb(59, 101, 80)),
+            color("text", Color.rgb(25, 32, 28)), color("muted", Color.rgb(88, 99, 91))
+        )
+        updateNativeNavigation()
     }
     private fun backPhase(phase: String, progress: Float = 0f, originX: Float = 0f, originY: Float = .65f) { web.evaluateJavascript("window.dolphinBack?.('${phase}',${progress},${originX},${originY})", null) }
     private fun dispatchBack() {
@@ -255,7 +315,8 @@ class MainActivity : Activity() {
                 try {
                     val data = JSONObject(raw)
                     when(data.getString("type")) {
-                        "ready" -> { pageReady = true; injectInsets(); theme(); handleIntent(intent); updatesStatus(); AppUpdates.check(this@MainActivity) { updatesStatus() } }
+                        "ready" -> { pageReady = true; injectInsets(); updateNativeNavigation(true); theme(); handleIntent(intent); updatesStatus(); AppUpdates.check(this@MainActivity) { updatesStatus() } }
+                        "navigationState" -> navigationState(data)
                         "updateStatus" -> updatesStatus()
                         "checkUpdate" -> { AppUpdates.check(this@MainActivity, true) { updatesStatus() }; updatesStatus() }
                         "downloadUpdate" -> { AppUpdates.download(this@MainActivity); updatesStatus(); message("已交给系统下载，完成后可在下载列表打开安装包") }
@@ -347,7 +408,7 @@ class MainActivity : Activity() {
         }
     }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleIntent(intent) }
-    override fun onConfigurationChanged(newConfig: Configuration) { super.onConfigurationChanged(newConfig); theme() }
+    override fun onConfigurationChanged(newConfig: Configuration) { super.onConfigurationChanged(newConfig); theme(); injectInsets(); updateNativeNavigation(true); ViewCompat.requestApplyInsets(content) }
     private fun handleIntent(intent: Intent) { if(!pageReady) return; intent.getStringExtra("courseId")?.let { send(JSONObject().put("type",if(intent.getBooleanExtra("navigateCourse",false)) "navigateCourse" else "course").put("courseId",it)); intent.removeExtra("courseId"); intent.removeExtra("navigateCourse") }; if(intent.getBooleanExtra("poke",false)) { message("海豚收到啦，今天也一起加油！"); intent.removeExtra("poke") } }
     override fun onResume() { super.onResume(); if(::web.isInitialized) web.onResume(); if(pageReady) { ReminderScheduler.enqueue(this); Notifications.pet(this); AppUpdates.schedule(this); AppUpdates.check(this) { updatesStatus() }; updatesStatus() } }
     override fun onPause() { if(::web.isInitialized) web.onPause(); super.onPause() }

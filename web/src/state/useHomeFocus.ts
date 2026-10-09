@@ -7,25 +7,18 @@ export function useHomeFocus({schedule,mode,ready,overlayOpen,layoutEditing}:Opt
  const roots={list:listRoot,grid:gridRoot},headers={list:listControls,grid:gridControls};
  const root=mode?roots[mode]:undefined;
  const [focus,setFocus]=useState<ViewFocus>(()=>({date:dateKey(new Date()),sectionIndex:1,source:'initial'}));
- const [gridToolbarHidden,setGridToolbarHidden]=useState(false),toolbarHidden=useRef(false),gridScroll=useRef({top:0,travel:0});
  const current=useRef(focus),requested=useRef<ViewFocus|null>(null),initialized=useRef(false),interacted=useRef(false),previousMode=useRef(mode),restoring=useRef(false),restoreFrame=useRef(0);
  const context=useRef({schedule,mode,overlayOpen,layoutEditing});context.current={schedule,mode,overlayOpen,layoutEditing};current.current=focus;
  function remember(next:ViewFocus){current.current=next;setFocus(old=>old.date===next.date&&old.sectionIndex===next.sectionIndex&&old.courseId===next.courseId&&old.source===next.source?old:next);}
- function setToolbarHidden(hidden:boolean){
-  if(toolbarHidden.current===hidden)return;toolbarHidden.current=hidden;
-  // Update hit testing before capturing focus in the same scroll event.
-  if(gridControls.current){gridControls.current.dataset.toolbarHidden=String(hidden);gridControls.current.inert=hidden;}
-  setGridToolbarHidden(hidden);
- }
  function readingArea(){
   const active=context.current.mode;if(!active)return null;const currentRoot=roots[active],currentControls=headers[active];
   const screen=currentRoot.current?.closest<HTMLElement>('.screen');if(!screen)return null;
   const rect=screen.getBoundingClientRect(),header=currentControls.current?.getBoundingClientRect(),safeTop=rect.top+parseFloat(getComputedStyle(screen).paddingTop);
-  const dock=document.querySelector<HTMLElement>('.dock')?.getBoundingClientRect(),floating=document.querySelector<HTMLElement>('.floating-actions button')?.getBoundingClientRect();
-  // The grid toolbar keeps its space while animating. Its transform must not move the semantic reading anchor.
-  const headerBottom=active==='grid'?(toolbarHidden.current?safeTop:safeTop+(header?.height??0)):(header?.bottom??safeTop);
+  const navigation=document.querySelector<HTMLElement>('.primary-navigation')?.getBoundingClientRect(),floating=document.querySelector<HTMLElement>('.floating-actions button')?.getBoundingClientRect();
+  // Controls scroll with the content; only their visible part affects the reading anchor.
+  const headerBottom=header?.bottom??safeTop;
   const top=Math.max(safeTop,headerBottom)+12;
-  const bottom=Math.min(rect.bottom,(dock?.top??rect.bottom)-12,(floating?.top??rect.bottom)-8);
+  const bottom=Math.min(rect.bottom,(navigation&&navigation.width>navigation.height?navigation.top:rect.bottom)-12,(floating?.top??rect.bottom)-8);
   return {screen,top,bottom:Math.max(top+48,bottom),left:rect.left,right:rect.right,anchor:top+Math.max(48,bottom-top)*.38};
  }
  function capture(horizontal=false){
@@ -64,7 +57,6 @@ export function useHomeFocus({schedule,mode,ready,overlayOpen,layoutEditing}:Opt
   if(!initialized.current){initialized.current=true;if(!interacted.current){const first=initialHomeFocus(schedule,new Date());requested.current=first;remember(first);return;}}
   if(previousMode.current!==mode){previousMode.current=mode;requested.current??=current.current;}
   const target=requested.current;if(!target)return;requested.current=null;
-  if(mode==='grid'){setToolbarHidden(false);gridScroll.current.travel=0;}
   const area=readingArea();if(!area)return;
   const section=Math.max(1,Math.min(schedule.periods.length,target.sectionIndex));
   const anchors=[...root.current.querySelectorAll<HTMLElement>('[data-focus-kind]')];
@@ -84,16 +76,6 @@ export function useHomeFocus({schedule,mode,ready,overlayOpen,layoutEditing}:Opt
   const scroll=(event:Event)=>{
    const active=context.current.mode?roots[context.current.mode].current?.closest<HTMLElement>('.screen'):null;
    if(event.currentTarget!==active||!active)return;
-   if(context.current.mode==='grid'){
-    const top=active.scrollTop,delta=top-gridScroll.current.top;gridScroll.current.top=top;
-    if(top<24){setToolbarHidden(false);gridScroll.current.travel=0;}
-    else if(restoring.current||context.current.overlayOpen)gridScroll.current.travel=0;
-    else{
-     const travel=gridScroll.current.travel;gridScroll.current.travel=Math.sign(delta)===Math.sign(travel)?travel+delta:delta;
-     if(gridScroll.current.travel<-12)setToolbarHidden(false);
-     else if(gridScroll.current.travel>24)setToolbarHidden(true);
-    }
-   }
    if(!restoring.current&&context.current.mode&&!context.current.overlayOpen){interacted.current=true;capture();}
   };
   const horizontal=gridRoot.current?.querySelector<HTMLElement>('.week-grid-scroll');
@@ -101,7 +83,7 @@ export function useHomeFocus({schedule,mode,ready,overlayOpen,layoutEditing}:Opt
   horizontal?.addEventListener('scroll',pan,{passive:true});
   screens.forEach(screen=>screen.addEventListener('scroll',scroll,{passive:true}));return()=>{cancelAnimationFrame(restoreFrame.current);screens.forEach(screen=>screen.removeEventListener('scroll',scroll));horizontal?.removeEventListener('scroll',pan);};
  },[]);
- return {roots,headers,focus,selectDate,rememberCourse,prepareSwitch,gridToolbarHidden};
+ return {roots,headers,focus,selectDate,rememberCourse,prepareSwitch};
 }
 
 export type HomeView=ReturnType<typeof useHomeFocus>;

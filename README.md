@@ -8,20 +8,26 @@
 
 Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 React 界面提供网页版和 Android 安装版：主页看课程，点击课程看教师、教室和教材，需要时再开启提醒、导航或系统日历。
 
-无需账号，没有自建业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。本文对应 **1.4.4 源码**，各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
+无需账号，没有自建业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。本文对应 **1.4.5 源码**，各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
 
 在线使用：[Dolphin Calendar 网页版](https://tequed232.github.io/Dolphin-Calendar/)。网页版发布运行 `npm run build:pages`，入口为 `build/pages/index.html`。该入口内置编译后的界面代码和样式，图片与离线缓存文件随整个目录发布，支持 `/Dolphin-Calendar/` 子路径。不要将开发用的 `web/index.html` 单独上传。发布工作流和 Pages 发布条件见 [发布说明](docs/PUBLISHING.md)。
 
 [功能](#功能概览) · [JSON 格式](#json-课表格式) · [本地开发](#本地开发) · [架构](#工程架构) · [验证](#验证与测试) · [许可](#许可证与美术资产)
 
 <p align="center">
-  <img src="docs/images/onboarding.png" width="260" alt="首次启动：用三步介绍导入、查看与导航、提醒与外观" />
-  <img src="docs/images/home-demo.png" width="260" alt="历史主页示例：日期选择、下一节课、当日日程与旧版三项底栏" />
+  <img src="docs/images/navigation-portrait-1.4.5.png" width="260" alt="1.4.5 竖屏：课表工具栏与星期分开占位，四项实体底部导航" />
+  <img src="docs/images/navigation-landscape-1.4.5.png" width="540" alt="1.4.5 横屏：左侧四项导航，课表使用完整可用宽度" />
 </p>
 
-*截图中的课程、教师和地点为演示数据。主页图保留旧版三项底栏，供外观参考；1.4.4 使用下文的“列表 / 平铺 / 搜索 / 设置”四项底栏。界面支持浅色、深色与跟随系统。*
+*截图为 1.4.5 网页界面的实际验证画面，课程、教师和地点均为演示数据。Android 使用 WebView 外的原生导航，竖屏置底、横屏和宽屏置于侧边。界面支持浅色、深色与跟随系统。*
 
-## 1.4.4 变更与交付包对比
+## 1.4.5 界面完善
+
+顶部课表工具栏与课程网格分开占位，修复星期和课程被浮窗遮挡；月历支持左右连续拖动翻月、跨年，以及展开年月区后的年份滑动条切年。竖屏使用实体底部导航，横屏及宽屏使用侧栏。Android 导航采用 WebView 外的原生 View，网页使用对应布局，课程详情、弹层、二级任务和输入法期间隐藏导航。
+
+本轮允许修改界面实现，继续保留课表业务和本地数据格式。正式包沿用原包名与原签名，版本码 **10405**，支持覆盖旧正式版。界面、配置、兼容范围及验证状态见 [1.4.5 UI 改造记录](docs/UI_1.4.5.md)；最新已发布附件见 [Releases](https://github.com/tequed232/Dolphin-Calendar/releases)。
+
+## 1.4.4 历史变更与交付包对比
 
 本版从作者提供的 2026-10-08 交付包同步现有功能实现，并重新编译为可覆盖旧正式版的 APK；交付包自带的 1.4.3 调试 APK 不用于正式发行。对比基准是线上 1.4.3 的 `7f2a657`。本次不改写功能实现，只调整发行版本及文档、验证配置。
 
@@ -35,13 +41,13 @@ Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 Re
 
 Release 和 Pages 已发布，线上附件、完整标签 CI 与页面核对结果见 [发布完成记录](docs/PUBLICATION_1.4.4.md)。
 
-运行 `node scripts/check-delivery-integrity.mjs` 可复核 123 个应用源码及资源文件与交付包一致；仅版本元数据允许改变。
+1.4.4 发布时的 123 项交付包哈希基线仍保留。当前 `node scripts/check-delivery-integrity.mjs` 列明本轮获授权的 UI 修改和删除，继续严格验证其余应用源码与资源；它不再声称本轮全部源码未改变。
 
 ## 功能概览
 
 ### 课表与导航
 
-设置中的“课表管理”和主页的同名入口打开同一页面，集中课程、学期、每日节数、上下课时间和导入；页面内的“课表设置”区域复用现有配置组件，导出与恢复集中到“数据与备份”。新安装默认进入列表，已有显示模式沿用保存值。平铺默认处于浏览状态，长按或“调整布局”进入单门课程布局编辑；点击空白、返回和切换页面/模式可退出。底栏固定为“列表 / 平铺 / 搜索 / 设置”，顶部不再重复切换。只有平铺显示顶部玻璃浮动框，材质沿用 Dock，下滑收起、上滑显示；列表使用普通页头。列表与平铺共享课程/日期/节次焦点，切换后保持阅读位置；二级任务隐藏底栏并保留返回位置。
+设置中的“课表管理”和主页的同名入口打开同一页面，集中课程、学期、每日节数、上下课时间和导入；页面内的“课表设置”区域复用现有配置组件，导出与恢复集中到“数据与备份”。新安装默认进入列表，已有显示模式沿用保存值。平铺默认处于浏览状态，长按或“调整布局”进入单门课程布局编辑；点击空白、返回和切换页面/模式可退出。导航顺序固定为“列表 / 平铺 / 搜索 / 设置”，竖屏置底、横屏或宽屏置于侧边，顶部不再重复切换。列表和平铺的顶部工具栏进入文档流，随内容滚动；说明换行时课程网格按真实高度占位。列表与平铺共享课程/日期/节次焦点，切换后保持阅读位置；二级任务、详情和弹层隐藏导航；返回任务时保留阅读位置。月历可左右连续拖动翻月并跨年，点年月标题可输入年份、选择月份或切换年份。
 
 平铺课表、临时课程、统一 CSV/Excel 导入、动态节次及焦点切换的格式、迁移和验证说明见 [开发升级说明](docs/DEVELOPMENT_UPGRADE.md)；本轮问题、修改与验收映射见 [交互验收清单](docs/NAVIGATION_INTERACTION.md)。
 
@@ -66,7 +72,7 @@ Android 权限用于 **日历读写、系统通知及实时更新请求、版本
 - 自定义背景接受 JPG、PNG、WebP，单张不超过 **10 MB**；推荐 **1080×1920** 或 **1440×2560** 竖图，主体放在中央。
 - 图片固定在底层，自动居中铺满，不跟随页面滚动。不同屏幕可能裁去边缘；大图在本机缩小处理，不改动原文件。
 - 背景毛玻璃可在 **0–30 px** 间调节：拖动实时预览，松手保存；0 表示清晰原图。模糊只作用于背景。
-- 稳定版暂时隐藏原有液态玻璃三档开关，保留底栏材质参数。此前保存的“完全”在本分支按“部分”呈现，已有“关闭”仍保持关闭；不会覆盖保存的原始偏好。
+- 导航采用清晰的实体表面，旧 Dock 的光泽、散射和扭曲选项已移除。原玻璃偏好仍保存在本地，背景毛玻璃、主题、缩放、安全区和性能模式继续可用。
 - 本机另有 `codex/liquidglass` 实验工作树，探索完整界面的折射实现；**本次未上传该实验工作树或其分支**。仓库中的 `main` 不包含其新组件，旧版的半透明模糊测试不能证明实验实现的折射效果。
 
 ### 系统日历与节假日
@@ -241,7 +247,7 @@ IndexedDB 事务提交成功后才广播新的 React 状态，避免导入页和
 
 ```text
 web/src/
-  components/     共享月历、课程弹层、引导和 Dock
+  components/     共享月历、课程弹层、引导和实体导航
   screens/        主页、搜索、设置、导入与背景等页面
   lib/            数据模型、JSON 解析、图片处理和原生桥
   state/          IndexedDB 提交、状态与异步读取
@@ -271,6 +277,8 @@ node scripts/check-delivery-integrity.mjs
 
 ```powershell
 npm run check:ui
+node scripts/check-responsive-navigation.mjs
+node scripts/check-calendar-swipe.mjs
 node scripts/check-current-time-line.mjs
 node scripts/check-toolbar-import.mjs
 node scripts/check-primary-navigation.mjs
@@ -289,9 +297,9 @@ node scripts/check-master-glass.mjs
 node scripts/check-offline.mjs
 ```
 
-这些流程覆盖首次引导、草稿离开保护、空状态、搜索、导入取消与错误恢复、日期选择、背景、节假日、离线和持久化。结构守卫还会修改关键实现并确认检查能拒绝错误变体。`npm run check` 包含源码准入、交付包一致性、工程及资产检查与两份 TypeScript 测试；单独执行一致性命令便于复核本次同步边界。测试优先使用本机已有 Chrome / Edge，可设置 `CHROME_PATH` 指定浏览器，或设置 `TEST_URL` 指向其他已启动的本地服务。
+这些流程覆盖首次引导、草稿离开保护、空状态、搜索、导入取消与错误恢复、日期选择、背景、节假日、离线和持久化。结构守卫还会修改关键实现并确认检查能拒绝错误变体。`npm run check` 包含源码准入、历史交付包范围检查、工程及资产检查与两份 TypeScript 测试；单独执行一致性命令便于复核本次同步边界。测试优先使用本机已有 Chrome / Edge，可设置 `CHROME_PATH` 指定浏览器，或设置 `TEST_URL` 指向其他已启动的本地服务。
 
-`node scripts/ci.mjs` 会启动自己的开发服务并顺序运行 20 组浏览器检查，运行前停止已占用 5173 端口的服务。Pages 另执行 `npm run build:pages` 与 `node scripts/check-pages.mjs`，检查项目子路径、旧缓存升级、导入持久化和离线回退。网页默认自动检查版本，离线及 Pages 验证只允许访问本仓库官方 Release API；这项可选请求不传送课表数据。
+`node scripts/ci.mjs` 会启动自己的开发服务并顺序运行 22 组浏览器检查，运行前停止已占用 5173 端口的服务。Pages 另执行 `npm run build:pages` 与 `node scripts/check-pages.mjs`，检查项目子路径、旧缓存升级、导入持久化和离线回退。网页默认自动检查版本，离线及 Pages 验证只允许访问本仓库官方 Release API；这项可选请求不传送课表数据。
 
 导入链路默认使用仓库内的合成旧格式数据，不依赖作者桌面的旧项目。需要额外核对旧版 `schedule.ts` 时，可显式设置 `LEGACY_SCHEDULE_PATH` 后运行 `check-import-ui.mjs`；真实课表样本不进入发布用源码。
 
@@ -303,9 +311,9 @@ node scripts/check-onboarding.mjs
 Remove-Item Env:TEST_OFFLINE
 ```
 
-Android 检查使用独立的调试包和专用模拟器；例如指定 `ANDROID_SERIAL=emulator-5554` 后运行 `check-background-device.mjs`、`check-holidays-device.mjs` 或 `check-calendar-device.mjs`。`check-android-interaction.mjs` 是 1.4.0 的历史设备流程，其中要求“完全”玻璃模式；**不适用于当前稳定版**。请先阅读各脚本的备份、恢复与设备选择逻辑，勿将测试当作普通使用流程。结构化结果与截图写入 `build/evidence/`，Android lint 报告位于 `app/build/reports/`。
+Android 当前导航检查为 `scripts/check-native-navigation.mjs`，实际覆盖升级为 `scripts/check-release-upgrade.mjs`；使用明确指定的独立模拟器，参数和合成样本准备见脚本。旧 `check-dock-device.mjs`、`check-keyboard-device.mjs`、`check-background-device.mjs`、`check-holidays-device.mjs`、`check-device.mjs`、`check-android-interaction.mjs` 和 `check-liquid-modes.mjs` 对应历史透明 Dock/玻璃流程，不能用作 1.4.5 证据；复现历史行为请检出相应旧标签。请先阅读各脚本的备份、恢复与设备选择逻辑，勿将测试当作普通使用流程。结构化结果与截图写入 `build/evidence/`，Android lint 报告位于 `app/build/reports/`。
 
-仓库提供 [GitHub Actions 验证工作流](.github/workflows/verify.yml)，执行网页构建、基础及浏览器检查、Android debug 构建、JVM 单元测试和 lint；构建产物不提交到仓库，也不上传为普通验证工作流附件。[Pages 工作流](.github/workflows/static.yml) 单独检查交付包源码一致性、构建并验证 `build/pages`，随后上传专用 Pages 部署附件。某个版本是否通过、是否有对应实机证据，以 [STATUS.md](docs/STATUS.md) 及其记录为准。
+仓库提供 [GitHub Actions 验证工作流](.github/workflows/verify.yml)，执行网页构建、基础及浏览器检查、Android debug 构建、JVM 单元测试和 lint；构建产物不提交到仓库，也不上传为普通验证工作流附件。[Pages 工作流](.github/workflows/static.yml) 单独检查历史交付包哈希与明确 UI 变更范围、构建并验证 `build/pages`，随后上传专用 Pages 部署附件。某个版本是否通过、是否有对应实机证据，以 [STATUS.md](docs/STATUS.md) 及其记录为准。
 
 ### 已知边界
 
@@ -334,7 +342,7 @@ npm run check:source-files
 - 保存失败和空导入应明确报错，不能作为“空表成功”；写入成功后再更新界面。
 - 返回或取消保护未保存的编辑，重复点击不得重复导入或重复创建课程。
 - 原生能力按使用时申请权限；系统日历操作只管理应用自己的课程日历。
-- Dock 固定在窗口底部，背景固定在独立底层；避免键盘上浮、透镜方形漏光和过度滤镜重建。
+- 导航占用独立的内容边界，横屏可改为侧栏；弹层和键盘避让不应遮挡输入与操作。背景固定在独立底层。
 
 作者 GitHub：[tequed232](https://github.com/tequed232/)。发布前文档、资源与签名检查见 [发布检查清单](docs/PUBLISHING.md)。
 
@@ -342,6 +350,6 @@ npm run check:source-files
 
 仓库初始化时由作者选择 **GNU GPL v3.0**，完整条款保留在仓库根目录 `LICENSE`。本项目业务源码沿用该许可证；私有仓库的可见性与访问权限仍由 GitHub 设置控制。
 
-React、AndroidX、Kotlin、Vite、TypeScript、Material Symbols 等组件遵循各自许可证，完整列表见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 `legal/`。Dock 的分层与折射参考不表示项目直接链接了 Miuix 或 AndroidLiquidGlass 的原生 Compose 依赖。
+React、AndroidX、Kotlin、Vite、TypeScript、Material Symbols 等组件遵循各自许可证，完整列表见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 `legal/`。旧 Dock 的分层与折射参考保留历史归属；当前原生导航使用平台 View，没有直接链接 Miuix 或 AndroidLiquidGlass Compose 库。
 
 品牌图、默认背景插画和包含这些图像的截图是作者提供的项目资源，**不自动受第三方组件许可证或未来的业务代码许可证覆盖**。仓库公开展示这些素材不代表授予下游再分发、再许可或商业使用权；美术资产的授权范围需另行说明。资源入口与替换要求见 [BRAND_ASSETS.md](docs/BRAND_ASSETS.md)。

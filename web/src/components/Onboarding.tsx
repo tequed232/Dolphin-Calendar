@@ -1,7 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {Dialog} from './Dialog';
 import {Icon,type IconName} from './Icon';
-import {SHOW_GLASS_MODE_SETTINGS} from '../lib/features';
 import '../theme/onboarding.css';
 
 type GuideAction=()=>void|Promise<void>;
@@ -18,7 +17,7 @@ const STEPS:GuideStep[]=[
   ]},
   {title:'按你的习惯，慢慢设置',description:'先开始使用，需要时再开启提醒或调整外观。',cards:[
     {icon:'bell',title:'提前提醒 → 去教室 → 我到了',text:'在“实时通知”开启课前提醒，导航到楼栋；点“我到了”收起实时状态。使用相关功能时才申请权限。'},
-    {icon:'image',title:'换背景，调整底栏质感',text:SHOW_GLASS_MODE_SETTINGS?'在“外观”使用内置插画或自选图片、调节毛玻璃；液态玻璃可选关闭、部分或完全。比例与安全区也能调整。':'在“外观”使用内置插画或自选图片、调节背景毛玻璃与底栏质感。界面缩放与安全区也能调整。'},
+    {icon:'image',title:'换背景，调整显示布局',text:'在“外观”使用内置插画或自选图片，调节背景毛玻璃、文字尺寸和安全区。竖屏使用底部导航，横屏和宽屏使用侧边导航。'},
   ]},
 ];
 

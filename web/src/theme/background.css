@@ -14,7 +14,7 @@
 .preview-content>strong{font-size:25px;line-height:1}
 .preview-content>p{font-size:9px;color:var(--muted);margin:0}
 .preview-content>div{background:var(--surface);border-radius:13px;min-height:53px;display:flex;align-items:center;gap:8px;padding:12px;font-size:10px;box-shadow:0 2px 8px #142d3307}
-.preview-content .preview-dock{min-height:38px;justify-content:space-around;margin-top:auto;padding:7px;color:var(--accent);border-radius:22px}
+.preview-content .preview-navigation{min-height:38px;justify-content:space-around;margin-top:auto;padding:7px;color:var(--accent);border-radius:0;border-top:1px solid var(--line);margin-inline:-12px;margin-bottom:-17px}
 .background-status{display:flex;flex-direction:column;gap:5px;text-align:center;overflow-wrap:anywhere}
 .background-status>small{color:var(--muted);font-size:12px}
 .background-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
@@ -39,5 +39,5 @@
  .preview-content{padding:12px 10px;gap:8px}
  .preview-content>strong{font-size:22px}
  .preview-content>div{min-height:42px;padding:9px}
- .preview-content .preview-dock{min-height:32px;padding:6px}
+ .preview-content .preview-navigation{min-height:32px;padding:6px}
 }

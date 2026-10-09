@@ -23,7 +23,7 @@ async function seed(courses,patch={}){
 }
 async function select(date){await page.evaluate(value=>window.dispatchEvent(new CustomEvent('dolphin-date',{detail:value})),date);await page.waitForFunction(value=>document.querySelector('.term-row [role=status]')?.getAttribute('aria-label')?.startsWith(value),date);}
 async function revealAction(locator){
-  const box=await locator.boundingBox(),dock=await page.locator('.dock').boundingBox();
+  const box=await locator.boundingBox(),dock=await page.locator('.primary-navigation').boundingBox();
   if(box.y+box.height>dock.y-12)await active().evaluate((el,distance)=>el.scrollBy({top:distance,behavior:'instant'}),box.y+box.height-dock.y+12);
   const visible=await locator.boundingBox();assert.ok(visible.y>=0&&visible.y+visible.height<=dock.y-11,'操作按钮应能完整滚到 Dock 上方');
 }
@@ -160,7 +160,7 @@ try{
   await page.getByRole('button',{name:'打开月历选日期',exact:true}).click();
   await page.getByRole('button',{name:'2026-11-01，无课程',exact:true}).click();
   assert.equal(await page.getByRole('dialog',{name:'选择日期',exact:true}).count(),0);
-  assert.equal(await page.locator('.dock').count(),1);
+  assert.equal(await page.locator('.primary-navigation').count(),1);
   pass('330×640、110% 比例、深色与减少动态效果下，输入、清除、空状态操作均无横向溢出');
   await seed(courses,{showTimes:false});await select('2026-10-07');
   assert.equal(await page.locator('.period-label > span').count(),0);

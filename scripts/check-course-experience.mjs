@@ -17,11 +17,22 @@ async function nativeClose(){await page.locator('dialog[open]').last().evaluate(
 try{
   await page.addInitScript(()=>{
     const original=IDBObjectStore.prototype.put;
-    IDBObjectStore.prototype.put=function(...args){window.__writes=(window.__writes??0)+1;if(window.__failWrite)throw new DOMException('测试保存失败','QuotaExceededError');return original.apply(this,args);};
+    // A release cache write can complete while a course is being saved. Count
+    // actual app writes, while retaining every store/key to catch other writes.
+    IDBObjectStore.prototype.put=function(...args){(window.__writeKeys??=[]).push({store:this.name,key:args[1]});if(this.name==='state'&&args[1]==='app')window.__appWrites=(window.__appWrites??0)+1;if(window.__failWrite)throw new DOMException('测试保存失败','QuotaExceededError');return original.apply(this,args);};
     const transaction=IDBDatabase.prototype.transaction;
     IDBDatabase.prototype.transaction=function(...args){const tx=transaction.apply(this,args);if(args[1]==='readwrite'){const descriptor=Object.getOwnPropertyDescriptor(IDBTransaction.prototype,'oncomplete');Object.defineProperty(tx,'oncomplete',{set(handler){descriptor.set.call(tx,handler?event=>{if(window.__saveDelay)setTimeout(()=>handler.call(tx,event),window.__saveDelay);else handler.call(tx,event);}:null);},get(){return descriptor.get.call(tx);}});}return tx;};
     const decode=Image.prototype.decode;
     Image.prototype.decode=function(){const result=decode.call(this);return window.__coverDelay?Promise.all([result,new Promise(resolve=>setTimeout(resolve,window.__coverDelay))]).then(()=>undefined):result;};
+  });
+  // Deterministically reproduce the unrelated release-cache/app-save race.
+  // Only the official metadata endpoint is mocked; app save code stays real.
+  let delayRelease=false,markReleasePending;
+  const releasePending=new Promise(resolve=>{markReleasePending=resolve;});
+  await page.route('https://api.github.com/repos/tequed232/Dolphin-Calendar/releases/latest',async route=>{
+    if(!delayRelease){await route.fulfill({status:503,body:'temporary verification response'});return;}
+    markReleasePending();await page.waitForFunction(()=>window.__saveDelay===700);
+    await route.fulfill({json:{tag_name:`v${version}`,name:'验证发行元数据',html_url:`https://github.com/tequed232/Dolphin-Calendar/releases/tag/v${version}`,body:'',assets:[]}});
   });
   await page.goto(url);await page.locator('.load-note').waitFor({state:'hidden'});
   await page.evaluate(async()=>{
@@ -29,7 +40,7 @@ try{
     value.schedule.courses=[{id:'experience-course',name:'体验验证课程',teacher:'林老师',room:'16栋203号教室',day:1,start:1,end:2,weeks:Array.from({length:30},(_,i)=>i+1),color:'blue',notes:'第一行\n第二行'}];
     const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('dolphin-calendar',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});await new Promise((resolve,reject)=>{const tx=db.transaction('state','readwrite');tx.objectStore('state').put(value,'app');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();
   });
-  await page.reload();await page.locator('.load-note').waitFor({state:'hidden'});await coursePage();
+  delayRelease=true;await page.reload();await page.locator('.load-note').waitFor({state:'hidden'});await releasePending;await coursePage();
   await check('未改动的新课程直接取消，默认保留整个学期周次',async()=>{
     await page.getByRole('button',{name:'添加',exact:true}).click();assert.equal(await editor().getByRole('textbox',{name:'周次',exact:true}).inputValue(),'1-30');await editor().getByRole('button',{name:'取消',exact:true}).click();assert.equal(await page.locator('dialog[open]').count(),0);
   });
@@ -41,7 +52,7 @@ try{
     await nativeClose();await confirmation().waitFor();await confirmation().getByRole('button',{name:'继续编辑',exact:true}).click();assert.equal(await editor().getByRole('textbox',{name:'课程名',exact:true}).inputValue(),'新增体验课');await page.keyboard.press('Escape');await confirmation().waitFor();await page.keyboard.press('Escape');assert.equal(await confirmation().count(),0);await nativeClose();await confirmation().getByRole('button',{name:'保存并关闭',exact:true}).click();assert.match(await editor().innerText(),/开始节次不能晚于结束节次/);assert.equal(await confirmation().count(),0);
   });
   await check('保存中阻止关闭和重复提交，课程换行按原文保存',async()=>{
-    await editor().getByRole('button',{name:'开始节次',exact:true}).click();await editor().getByRole('option',{name:'第 1 节',exact:true}).click();await editor().getByRole('textbox',{name:'周次',exact:true}).fill('1-30双');await editor().getByRole('textbox',{name:'备注',exact:true}).fill('准备课本\n带好笔记');await page.evaluate(()=>{window.__writes=0;window.__saveDelay=700;});await editor().locator('form').evaluate(form=>{form.requestSubmit();form.requestSubmit();});await page.getByRole('dialog',{name:'课程时间冲突'}).getByRole('button',{name:'仍然保存',exact:true}).click();await page.waitForTimeout(80);assert.equal(await editor().getByRole('button',{name:'正在保存…',exact:true}).isDisabled(),true);await nativeClose();assert.equal(await editor().count(),1);await page.waitForFunction(()=>document.querySelectorAll('dialog[open]').length===0);await page.evaluate(()=>{window.__saveDelay=0;});const saved=await state();assert.equal(saved.schedule.courses.filter(c=>c.name==='新增体验课').length,1);assert.equal(saved.schedule.courses.find(c=>c.name==='新增体验课').notes,'准备课本\n带好笔记');assert.deepEqual(saved.schedule.courses.find(c=>c.name==='新增体验课').weeks,Array.from({length:15},(_,i)=>(i+1)*2));assert.equal(await page.evaluate(()=>window.__writes),1);
+    await editor().getByRole('button',{name:'开始节次',exact:true}).click();await editor().getByRole('option',{name:'第 1 节',exact:true}).click();await editor().getByRole('textbox',{name:'周次',exact:true}).fill('1-30双');await editor().getByRole('textbox',{name:'备注',exact:true}).fill('准备课本\n带好笔记');await page.evaluate(()=>{window.__appWrites=0;window.__writeKeys=[];window.__saveDelay=700;});await editor().locator('form').evaluate(form=>{form.requestSubmit();form.requestSubmit();});await page.getByRole('dialog',{name:'课程时间冲突'}).getByRole('button',{name:'仍然保存',exact:true}).click();await page.waitForTimeout(80);assert.equal(await editor().getByRole('button',{name:'正在保存…',exact:true}).isDisabled(),true);await nativeClose();assert.equal(await editor().count(),1);await page.waitForFunction(()=>document.querySelectorAll('dialog[open]').length===0);await page.evaluate(()=>{window.__saveDelay=0;});const saved=await state();assert.equal(saved.schedule.courses.filter(c=>c.name==='新增体验课').length,1);assert.equal(saved.schedule.courses.find(c=>c.name==='新增体验课').notes,'准备课本\n带好笔记');assert.deepEqual(saved.schedule.courses.find(c=>c.name==='新增体验课').weeks,Array.from({length:15},(_,i)=>(i+1)*2));assert.equal(await page.evaluate(()=>window.__appWrites),1,'重复提交只能写入一次课程数据');const keys=await page.evaluate(()=>window.__writeKeys);assert.deepEqual(keys.filter(entry=>entry.key!=='release'),[{store:'state',key:'app'}]);assert.deepEqual(keys.filter(entry=>entry.key==='release'),[{store:'state',key:'release'}],'并发版本缓存应独立于课程保存');
   });
   await check('删除课程有明确取消，确认删除只移除目标课程',async()=>{
     await page.locator('.screen.active .course-disclosure').click();await page.locator('.screen.active .course-management .link-row').filter({hasText:'新增体验课'}).click();await editor().getByRole('button',{name:'删除课程',exact:true}).click();const modal=page.getByRole('dialog',{name:'删除这门课程？'});await modal.getByRole('button',{name:'取消',exact:true}).click();assert.equal(await editor().getByRole('textbox',{name:'课程名',exact:true}).inputValue(),'新增体验课');await editor().getByRole('button',{name:'删除课程',exact:true}).click();await modal.getByRole('button',{name:'确认删除',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('dialog[open]').length===0);assert.deepEqual((await state()).schedule.courses.map(c=>c.name),['体验验证课程']);

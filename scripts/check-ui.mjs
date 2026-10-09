@@ -18,9 +18,9 @@ async function backdropPixels(){const png=(await page.screenshot()).toString('ba
 try{
  await page.clock.setFixedTime(new Date(2026,8,29,9,0));
  await page.goto(URL);await page.getByRole('button',{name:'先逛一逛',exact:true}).click();
- await check('冷启动首页、常驻底栏、关闭引导不重开',async()=>{await page.waitForTimeout(350);assert.equal(await page.locator('dialog[open]').count(),0);assert.equal(await page.locator('.dock').count(),1);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'list');});
+ await check('冷启动首页、常驻底栏、关闭引导不重开',async()=>{await page.waitForTimeout(350);assert.equal(await page.locator('dialog[open]').count(),0);assert.equal(await page.locator('.primary-navigation').count(),1);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'list');});
  await check('二级导入任务隐藏Dock，键盘只缩短可编辑视口并恢复',async()=>{
-  await page.evaluate(()=>window.dolphinInsets(28,24,0,844));await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.locator('.screen.active .import-entry').click();assert.equal(await page.locator('.dock').count(),0);await pasteJSON(page);await page.getByRole('textbox',{name:'课表内容',exact:true}).focus();await page.evaluate(()=>window.dolphinInsets(28,24,320,844));await page.waitForTimeout(400);const input=await page.getByRole('textbox',{name:'课表内容',exact:true}).boundingBox();assert.ok(input.y<524&&input.y+input.height<=525);assert.equal(await page.locator('.screen-host').evaluate(el=>el.getBoundingClientRect().height),524);await page.setViewportSize({width:390,height:524});assert.equal(await page.locator('.dock').count(),0);await page.setViewportSize({width:390,height:844});await page.evaluate(()=>{document.activeElement.blur();window.dolphinInsets(28,24,0,844);});await goTab(page,'列表');await page.evaluate(()=>{window.dolphinInsets(0,0);document.documentElement.style.removeProperty('--native-height');});assert.equal(await page.locator('.dock').count(),1);
+  await page.evaluate(()=>window.dolphinInsets(28,24,0,844));await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.locator('.screen.active .import-entry').click();assert.equal(await page.locator('.primary-navigation').count(),0);await pasteJSON(page);await page.getByRole('textbox',{name:'课表内容',exact:true}).focus();await page.evaluate(()=>window.dolphinInsets(28,24,320,844));await page.waitForTimeout(400);const input=await page.getByRole('textbox',{name:'课表内容',exact:true}).boundingBox();assert.ok(input.y<524&&input.y+input.height<=525);assert.equal(await page.locator('.screen-host').evaluate(el=>el.getBoundingClientRect().height),524);await page.setViewportSize({width:390,height:524});assert.equal(await page.locator('.primary-navigation').count(),0);await page.setViewportSize({width:390,height:844});await page.evaluate(()=>{document.activeElement.blur();window.dolphinInsets(28,24,0,844);});await goTab(page,'列表');await page.evaluate(()=>{window.dolphinInsets(0,0);document.documentElement.style.removeProperty('--native-height');});assert.equal(await page.locator('.primary-navigation').count(),1);
  });
  await check('日期条持续双向滚动并点选，背景固定在视口',async()=>{
   const first=await page.locator('.date-item').first().getAttribute('aria-label');
@@ -42,45 +42,11 @@ try{
   await page.reload();await page.waitForFunction(()=>document.documentElement.dataset.dynamic==='false');
   assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'list');
  });
- await check('Dock 前景放大突出，背景采样尺寸保持稳定',async()=>{
-  const button=page.locator('.dock>button').first(),label=button.locator('.dock-content'),rim=page.locator('.dock-droplet-rim');
-  const idle=await label.boundingBox(),idleRim=await rim.boundingBox(),sampling=await page.locator('.dock-droplet').boundingBox();
-  const box=await button.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.waitForTimeout(300);
-  const pressed=await label.boundingBox(),pressedRim=await rim.boundingBox(),pressedSampling=await page.locator('.dock-droplet').boundingBox();
-  assert.ok(pressed.width>idle.width*1.2&&pressed.height>idle.height*1.2,'按住时应明显放大图标与标签');
-  assert.ok(pressed.y<idle.y-4,'前景应微微抬起');
-  assert.ok(pressedRim.width>idleRim.width+15,'玻璃轮廓应随按压展开');
-  assert.ok(Math.abs(pressedSampling.width-sampling.width)<1,'背景纹理范围不得被缩放');
-  await page.screenshot({path:'build/evidence/dock-pressed-browser.png'});
-  await page.mouse.up();await page.waitForTimeout(500);
-  const released=await label.boundingBox();assert.ok(Math.abs(released.width-idle.width)<1,'释放后应回到原始大小');
- });
- await check('Dock 液滴拖拽无尾线残影与阻尼回落',async()=>{
-  const box=await page.locator('.dock').boundingBox();assert.ok(box);
-  await page.mouse.move(box.x+box.width/6,box.y+box.height/2);await page.mouse.down();
-  await page.mouse.move(box.x+box.width*5/6,box.y+box.height/2,{steps:12});await page.waitForTimeout(260);
-  assert.equal(await page.locator('.dock').getAttribute('data-dragging'),'true');
-  assert.equal(await page.locator('.dock-tether').count(),0);
-  assert.equal(await page.locator('.dock>button').first().evaluate(e=>getComputedStyle(e).opacity),'1');
-  assert.equal(await page.locator('.dock').getAttribute('data-preview'),'3');
-  assert.doesNotMatch(await page.locator('.dock-droplet').evaluate(e=>e.style.transform),/scale\(/,'背景不得跟随液滴轮廓缩放');
-  const bounds=await page.locator('.dock-droplet').boundingBox();assert.ok(bounds);
-  assert.ok(bounds.x>=box.x-1&&bounds.x+bounds.width<=box.x+box.width+1&&bounds.y>=box.y-1&&bounds.y+bounds.height<=box.y+box.height+1,'液滴不能离开 Dock');
-  await page.mouse.up();await page.waitForTimeout(350);
-  assert.equal(await page.locator('.dock').getAttribute('data-dragging'),'false');
-  assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'settings');
-  await goTab(page,'列表');
- });
- await check('点按标签时液滴从旧位置弹性滑到新位置',async()=>{
-  await page.waitForTimeout(450);
-  const read=()=>page.locator('.dock-droplet').evaluate(element=>Number(new DOMMatrix(getComputedStyle(element).transform).m41));
-  const from=await read();
-  await page.locator('.dock').getByRole('button',{name:'设置',exact:true}).click();
-  const during=await read();
-  await page.waitForTimeout(550);
-  const to=await read();
-  assert.ok(to-from>100&&during<to-8,`点击应有可见的位移过程：${from}, ${during}, ${to}`);
-  await goTab(page,'列表');await page.waitForTimeout(450);
+ await check('实体导航不包含玻璃透镜、拖动层，四项标签直接切页',async()=>{
+  assert.equal(await page.locator('.dock,#glass-droplet').count(),0);
+  assert.deepEqual(await page.locator('.primary-navigation>button').allTextContents(),['列表','平铺','搜索','设置']);
+  const bounds=await page.locator('.primary-navigation').boundingBox(),host=await page.locator('.screen-host').boundingBox();assert.ok(host.y+host.height<=bounds.y+1);
+  for(const [name,route] of [['设置','settings'],['搜索','search'],['平铺','grid'],['列表','list']]){await goTab(page,name);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),route);assert.equal(await page.locator('.primary-navigation [aria-current=page]').innerText(),name);}
  });
  await goTab(page,'设置');
  await check('设置分组与入口顺序',async()=>{assert.deepEqual(await page.locator('.screen.active .setting-entry strong').allTextContents(),['主页显示','课表管理','外观','实时通知','导航与学校','应用更新','数据与备份','关于']);assert.equal(await page.locator('.screen.active [data-setting=editor]').count(),1);});
@@ -157,7 +123,7 @@ try{
  await page.getByRole('button',{name:'关闭课程详情',exact:true}).click();
  await page.screenshot({path:'build/evidence/home-390.png'});
  await check('搜索匹配高亮与直达详情',async()=>{await goTab(page,'搜索');await page.getByRole('searchbox',{name:'搜索课程',exact:true}).fill('陈老师');assert.equal(await page.locator('.screen.active mark').innerText(),'陈老师');await page.locator('.screen.active .result-card').click();assert.match(await page.locator('.course-sheet h1').innerText(),/数据结构/);await page.getByRole('button',{name:'关闭课程详情',exact:true}).click();});
- await check('标签切换不闪过主页，底栏只有一份',async()=>{await goTab(page,'设置');assert.equal(await page.locator('[data-screen=list]').evaluate(e=>getComputedStyle(e).visibility),'hidden');await goTab(page,'搜索');assert.equal(await page.locator('[data-screen=list]').evaluate(e=>getComputedStyle(e).visibility),'hidden');assert.equal(await page.locator('.dock').count(),1);});
+ await check('标签切换不闪过主页，底栏只有一份',async()=>{await goTab(page,'设置');assert.equal(await page.locator('[data-screen=list]').evaluate(e=>getComputedStyle(e).visibility),'hidden');await goTab(page,'搜索');assert.equal(await page.locator('[data-screen=list]').evaluate(e=>getComputedStyle(e).visibility),'hidden');assert.equal(await page.locator('.primary-navigation').count(),1);});
  await goTab(page,'设置');await page.locator('[data-setting="appearance"]').click();
  await check('圆角选择菜单与系统深浅模式实时切换',async()=>{
   const trigger=page.getByRole('button',{name:'深浅模式',exact:true});
@@ -171,11 +137,10 @@ try{
   await page.waitForFunction(()=>document.documentElement.dataset.mode==='light');
   await page.screenshot({path:'build/evidence/appearance-custom-controls.png'});
  });
- await check('稳定版隐藏玻璃模式，任务页无Dock，一级页仍保留可降级透镜',async()=>{
-  assert.equal(await page.locator('.dock').count(),0);assert.equal(await page.getByRole('button',{name:'液态玻璃模式',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'底栏边缘光泽',exact:true}).isVisible(),true);await goTab(page,'列表');await page.locator('.dock[data-droplet-ready=true]').waitFor();assert.match(await page.locator('#glass-droplet feImage').first().getAttribute('href'),/^data:image\/png/);assert.equal(await page.locator('.dock').evaluate(e=>getComputedStyle(e,'::before').backdropFilter.includes('glass-refraction')),false);
-  const full=await savedGlassMode('full');await page.waitForFunction(()=>document.documentElement.dataset.glassMode==='partial');assert.equal(await page.locator('.screen.active md-card').first().evaluate(e=>getComputedStyle(e).backdropFilter),'none');assert.deepEqual(await storedData(),full);await goTab(page,'列表');await page.locator('.dock[data-droplet-ready=true]').waitFor();
-  const off=await savedGlassMode('off');await page.waitForFunction(()=>document.documentElement.dataset.glassMode==='off');assert.deepEqual(await storedData(),off);await goTab(page,'列表');assert.equal(await page.locator('.dock').evaluate(e=>getComputedStyle(e,'::before').backdropFilter),'none');
-  const partial=await savedGlassMode('partial');await page.waitForFunction(()=>document.documentElement.dataset.glassMode==='partial');assert.deepEqual(await storedData(),partial);await goTab(page,'列表');await page.locator('.dock[data-droplet-ready=true]').waitFor();await goTab(page,'设置');await page.locator('[data-setting="appearance"]').click();
+ await check('旧玻璃偏好保留数据，实体导航不受透镜模式影响',async()=>{
+  assert.equal(await page.locator('.primary-navigation').count(),0);assert.equal(await page.getByRole('button',{name:'液态玻璃模式',exact:true}).count(),0);
+  for(const mode of ['full','off','partial']){const saved=await savedGlassMode(mode);assert.deepEqual(await storedData(),saved);await goTab(page,'列表');assert.equal(await page.locator('.primary-navigation').count(),1);assert.equal(await page.locator('.dock,#glass-droplet').count(),0);}
+  await goTab(page,'设置');await page.locator('[data-setting="appearance"]').click();
  });
  await check('不同触发高度与右边缘的返回收拢位置',async()=>{
   await page.waitForTimeout(350);
@@ -188,9 +153,9 @@ try{
  });
  await check('同步返回进度、降级玻璃、取消与提交只退一层',async()=>{
   await page.evaluate(()=>{window.dolphinBack('start');window.dolphinBack('progress',.6);});
-  assert.equal(await page.locator('html').evaluate(e=>e.style.getPropertyValue('--back-progress')),'0.6');assert.equal(await page.locator('.dock').count(),0);
+  assert.equal(await page.locator('html').evaluate(e=>e.style.getPropertyValue('--back-progress')),'0.6');assert.equal(await page.locator('.primary-navigation').count(),0);
   await page.evaluate(()=>window.dolphinBack('cancel'));await page.waitForTimeout(250);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'appearance');
-  await page.evaluate(()=>{window.dolphinBack('start');window.dolphinBack('progress',1);window.dolphinBack('commit');});await page.waitForTimeout(250);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'settings');assert.equal(await page.locator('.sub-screen').count(),0);assert.equal(await page.locator('.dock').count(),1);
+  await page.evaluate(()=>{window.dolphinBack('start');window.dolphinBack('progress',1);window.dolphinBack('commit');});await page.waitForTimeout(250);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'settings');assert.equal(await page.locator('.sub-screen').count(),0);assert.equal(await page.locator('.primary-navigation').count(),1);
  });
  await check('文本入口保留 JSON 校验，文件入口支持 JSON/CSV/Excel',async()=>{
    await goTab(page,'列表');await page.getByRole('button',{name:'课表管理',exact:true}).click();await page.locator('.screen.active .import-entry').click();

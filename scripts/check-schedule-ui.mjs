@@ -45,6 +45,8 @@ try{
  await check('确认同时保留冲突课程后真实分列，同段与跨段重叠课程均可查看和编辑',async()=>{
   const baseline=await state();
   await page.getByRole('button',{name:'添加临时课程',exact:true}).click();const add=page.getByRole('dialog',{name:'添加临时课程'});
+  // Toolbar is in document flow: scrolling to it can update the reading date. Choose the intended date explicitly.
+  await add.getByLabel('日期（留空按周次重复）',{exact:true}).fill('2026-10-07');assert.equal(await add.getByLabel('日期（留空按周次重复）',{exact:true}).inputValue(),'2026-10-07');
   await add.getByLabel('课程名',{exact:true}).fill('冲突自习');await add.getByRole('button',{name:'开始节次',exact:true}).click();await add.getByRole('option',{name:'第 5 节',exact:true}).click();await add.getByRole('button',{name:'持续节数',exact:true}).click();await add.getByRole('option',{name:'3 节',exact:true}).click();await add.getByRole('button',{name:'保存课程',exact:true}).click();
   const conflict=page.getByRole('dialog',{name:'课程时间冲突'});await conflict.waitFor();assert.match(await conflict.innerText(),/自习/);await conflict.getByRole('button',{name:'仍然保存',exact:true}).click();await page.locator('.grid-course-content').filter({hasText:'冲突自习'}).waitFor();assert.equal((await state()).schedule.courses.length,4);
   await seed(data=>({...data,schedule:{...data.schedule,courses:[...data.schedule.courses,{...data.schedule.courses.find(c=>c.name==='自习'),id:'overlap-bridge',name:'跨段自习',start:6,end:8}]}}));

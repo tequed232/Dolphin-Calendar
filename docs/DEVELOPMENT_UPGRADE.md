@@ -1,5 +1,10 @@
 # 课表、导入与显示升级
 
+## 1.4.5 响应式导航与弹层
+
+当前竖屏底栏、横屏侧栏、Android 平台原生 View、普通工具栏、连续月历和独立根部对话框的说明见 [UI_1.4.5.md](UI_1.4.5.md)。数据库与课表业务结构不变，旧显示模式、主题、教材、背景与玻璃参数继续读取。对话框不继承页面缩放，内容只按用户缩放显示一次。旧透明 Dock 的视觉参数不再展示，背景毛玻璃仍可配置。
+
+
 在原 React / TypeScript / Kotlin 项目内实现，共用已有组件、导航、课表模型和 IndexedDB。没有建立独立应用。
 
 ## 数据与同步
@@ -116,7 +121,8 @@ Android 继续使用原有 `AppUpdates.kt` / GitHub `releases/latest`、正式�
 | `web/src/screens/Updates.tsx` | 网页手动检查、Release 标题和发布时间 |
 | `web/src/App.tsx` | 统一导入/管理路由、返回编辑状态优先、稳定原生回调 |
 | `web/src/nav/useNavigation.ts` | 四个一级路由、任务完成返回、根导航不入历史 |
-| `web/src/components/GlassDock.tsx` | 按实际项目数量计算布局与透镜，四项等宽且保持已有材质 |
+| `web/src/components/PrimaryNavigation.tsx` / `web/src/nav/usePrimaryNavigation.ts` | 四项实体导航、响应式侧栏与原生能力确认 |
+| `app/src/main/java/com/dolphin/calendar/NativeNavigationView.kt` | WebView 外的 Android 原生导航视图 |
 | `web/src/components/ImportSteps.tsx` | 五阶段状态及无障碍语义 |
 | `web/src/lib/gridLayout.ts` | 整周课程、非等距行高与语义吸附 |
 | `web/src/theme/timetable.css` | 周网格、卡片、拖动、紧凑设置、响应式与深色样式 |

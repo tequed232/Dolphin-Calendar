@@ -106,13 +106,13 @@ async function openFile(file, origin = '列表') {
   await root(origin);
   await active().getByRole('button', {name: '导入课表', exact: true}).click();
   await page.locator('.screen.active[data-screen=import]').waitFor();
-  assert.equal(await page.locator('.dock').count(), 0);
+  assert.equal(await page.locator('.primary-navigation').count(), 0);
   await active().getByLabel('选择课表文件', {exact: true}).setInputFiles(file);
 }
 async function filePreview(file, origin = '列表') {
   await openFile(file, origin);
   await preview().waitFor();
-  assert.equal(await page.locator('.dock').count(), 0);
+  assert.equal(await page.locator('.primary-navigation').count(), 0);
   assert.equal(await preview().locator('.import-steps [data-state=current]').count(), 1);
   assert.match(await preview().locator('.import-steps [aria-current=step]').innerText(), /^4\n预览变更/);
 }
@@ -135,7 +135,7 @@ async function verifyTimesEditor(periods) {
     assert.equal(await active().getByLabel(`第${i + 1}节开始`, {exact: true}).inputValue(), period.start);
     assert.equal(await active().getByLabel(`第${i + 1}节结束`, {exact: true}).inputValue(), period.end);
   }
-  assert.equal(await page.locator('.dock').count(), 0);
+  assert.equal(await page.locator('.primary-navigation').count(), 0);
   await root();
 }
 async function verifyCourseChoices(count) {
@@ -202,7 +202,7 @@ try {
   const originalSync = await syncCount();
   await check('文件入口自动识别 JSON / CSV，二级页隐藏 Dock，步骤及卡片保留原有圆角', async () => {
     await active().getByRole('button', {name: '导入课表', exact: true}).click();
-    assert.equal(await page.locator('.dock').count(), 0);
+    assert.equal(await page.locator('.primary-navigation').count(), 0);
     assert.match(await active().locator('.import-file-option').innerText(), /JSON · CSV · Excel/);
     assert.equal(await active().locator('.import-steps li').count(), 5);
     assert.match(await active().locator('.import-steps [aria-current=step]').innerText(), /^1\n选择文件/);
@@ -306,12 +306,12 @@ try {
     assert.ok(Number.parseFloat(await active().locator('.grid-course').evaluate(el => getComputedStyle(el).borderRadius)) >= 8);
     assert.ok(Number.parseFloat(await active().locator('.home-controls').evaluate(el => getComputedStyle(el).borderRadius)) >= 20);
     await active().evaluate(el => el.scrollTop = el.scrollHeight); await page.waitForTimeout(100);
-    const row = await active().locator('.grid-period[data-period="14"]').boundingBox(), dock = await page.locator('.dock').boundingBox();
+    const row = await active().locator('.grid-period[data-period="14"]').boundingBox(), dock = await page.locator('.primary-navigation').boundingBox();
     assert.ok(row.y + row.height < dock.y - 8, JSON.stringify({row, dock}));
-    await active().locator('.grid-course').evaluate(el => {const screen = el.closest('.screen'), header = screen.querySelector('.home-controls').getBoundingClientRect(), dock = document.querySelector('.dock').getBoundingClientRect(); screen.scrollTop += el.getBoundingClientRect().top - header.bottom - (dock.top - header.bottom) * .25;});
+    await active().locator('.grid-course').evaluate(el => {const screen = el.closest('.screen'), header = screen.querySelector('.home-controls').getBoundingClientRect(), dock = document.querySelector('.primary-navigation').getBoundingClientRect(); screen.scrollTop += el.getBoundingClientRect().top - header.bottom - (dock.top - header.bottom) * .25;});
     await page.screenshot({path: path.join(evidence, 'file-times-grid.png')});
     await active().getByRole('button', {name: '导入课表', exact: true}).click();
-    assert.equal(await page.locator('.dock').count(), 0);
+    assert.equal(await page.locator('.primary-navigation').count(), 0);
     await active().evaluate(el => el.scrollTop = el.scrollHeight);
     const last = await active().locator('.import-local-note').boundingBox();
     assert.ok(last.y + last.height < 844 - 32, JSON.stringify(last));

@@ -1,4 +1,13 @@
-# 液态玻璃与返回交互
+# 导航材质与手势
+
+## 当前 1.4.5 实体导航
+
+竖屏实体底栏、横屏侧栏替代透明 Dock。Android 由 WebView 外的平台 View 显示，网页由 PrimaryNavigation 显示；能力确认避免双份导航。内容按实际栏尺寸占位，键盘及弹层期间隐藏导航，顶部工具栏随内容正常滚动。旧玻璃偏好保留，背景毛玻璃仍可设置；底栏透镜、按压放大与拖动胶囊已退休。真实月历拖动、业务焦点和原生返回仍需各自验收，见 [UI_1.4.5.md](UI_1.4.5.md)。
+
+## 以下为 1.4.0–1.4.4 玻璃实验与历史设计
+
+下文记录旧实现，不描述当前导航，也不作为当前功能承诺。
+
 
 1.4.0 保持 React + TypeScript 与 Kotlin WebView 共用界面。参考 [AndroidLiquidGlass 的 LiquidBottomTabs](https://github.com/Kyant0/AndroidLiquidGlass/blob/kmp/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/components/LiquidBottomTabs.kt) 的分层、限幅与按压原则，以本项目 DOM/CSS/SVG 实现；没有直接链接 Compose 组件库。
 

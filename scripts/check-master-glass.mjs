@@ -53,15 +53,15 @@ async function guideGeometry(){return page.locator('dialog[open]').evaluate(dial
 try{
   await page.clock.setFixedTime(new Date(2026,8,29,9));await page.goto(url);await ready();
   const defaults=await seed({glass:true,glassMode:'partial'});await appearance();await hiddenMode();
-  for(const name of ['底栏边缘光泽','底栏散射','底栏扭曲','性能模式'])assert.ok(await page.getByRole('button',{name,exact:true}).isVisible());
-  assert.equal(await page.locator('html').getAttribute('data-glass-mode'),'partial');assert.equal(await page.locator('.dock').count(),0);assert.deepEqual(await stored(),defaults);
+  assert.ok(await page.getByRole('button',{name:'性能模式',exact:true}).isVisible());for(const name of ['底栏边缘光泽','底栏散射','底栏扭曲'])assert.equal(await page.getByRole('button',{name,exact:true}).count(),0);
+  assert.equal(await page.locator('html').getAttribute('data-glass-mode'),'partial');assert.equal(await page.locator('.primary-navigation').count(),0);assert.deepEqual(await stored(),defaults);
   await active().evaluate(el=>el.scrollTop=el.scrollHeight);await settled();await page.screenshot({path:`build/evidence/${version}-master-appearance.png`});
-  await goTab(page,'列表');await page.locator('.dock[data-droplet-ready=true]').waitFor();assert.match(await page.locator('#glass-droplet feImage').first().getAttribute('href'),/^data:image\/png/);
-  pass('稳定版外观隐藏三档选择与相关说明，保留底栏参数和真实透镜');
+  await goTab(page,'列表');await page.locator('.primary-navigation').waitFor();assert.equal(await page.locator('#glass-droplet').count(),0);
+  pass('稳定版外观隐藏三档选择与相关说明，退休旧底栏参数，显示实体导航');
 
   for(const settings of [{glass:false,glassMode:null},{glass:false,glassMode:'off'}]){
     const before=await seed(settings);assert.equal(await page.locator('html').getAttribute('data-glass-mode'),'off');assert.equal(await page.locator('html').getAttribute('data-glass'),'false');
-    assert.equal(await page.locator('.dock').evaluate(el=>getComputedStyle(el,'::before').backdropFilter),'none');
+    assert.equal(await page.locator('.primary-navigation').evaluate(el=>getComputedStyle(el,'::before').backdropFilter),'none');
     await appearance();await hiddenMode();assert.equal(await page.getByRole('button',{name:'底栏边缘光泽',exact:true}).count(),0);assert.deepEqual(await stored(),before);
     await goTab(page,'搜索');await page.getByRole('searchbox',{name:'搜索课程',exact:true}).fill('大学英语');assert.ok(await page.locator('.result-card').count());
     await page.reload();await ready();assert.equal(await page.locator('html').getAttribute('data-glass-mode'),'off');assert.deepEqual(await stored(),before);
@@ -70,20 +70,20 @@ try{
 
   const full=await seed({glass:true,glassMode:'full'});
   assert.equal(await page.locator('html').getAttribute('data-glass-mode'),'partial');await solid('.date-panel,.course-card');
-  await page.locator('.dock[data-droplet-ready=true]').waitFor();assert.match(await page.locator('#glass-droplet feImage').first().getAttribute('href'),/^data:image\/png/);
+  await page.locator('.primary-navigation').waitFor();assert.equal(await page.locator('#glass-droplet').count(),0);
   await page.getByRole('button',{name:'选择日期',exact:true}).click();await solid('dialog[open]');await page.getByRole('button',{name:'关闭对话框',exact:true}).click();
   await goTab(page,'搜索');await page.getByRole('searchbox',{name:'搜索课程',exact:true}).fill('大学英语');await solid('.search-results');
   await appearance();await hiddenMode();await solid('.screen.active md-card,.screen.active .sub-header');assert.deepEqual(await stored(),full);
   await page.screenshot({path:`build/evidence/${version}-master-saved-full.png`});
-  pass('已保存 full 实际仅渲染底栏透镜，主页、搜索、月历与设置使用稳定材质');
+  pass('已保存 full 保留偏好且显示实体导航，主页、搜索、月历与设置使用稳定材质');
 
-  await page.getByRole('button',{name:'底栏散射',exact:true}).click();await page.getByRole('option',{name:'弥散 · 背景深度模糊',exact:true}).click();
-  await page.waitForFunction(()=>document.documentElement.style.getPropertyValue('--glass-blur')==='2.5px');
-  const adjusted={...full,settings:{...full.settings,scattering:2}};assert.deepEqual(await stored(),adjusted);assert.equal((await stored()).settings.glassMode,'full');
+  await page.getByRole('button',{name:'性能模式',exact:true}).click();await page.getByRole('option',{name:'自动 · 优先流畅，必要时减少滤镜',exact:true}).click();
+  await page.waitForFunction(()=>document.documentElement.dataset.performance==='full');
+  const adjusted={...full,settings:{...full.settings,performance:'auto'}};assert.deepEqual(await stored(),adjusted);assert.equal((await stored()).settings.glassMode,'full');
   await page.reload();await ready();assert.equal(await page.locator('html').getAttribute('data-glass-mode'),'partial');assert.deepEqual(await stored(),adjusted);
   await page.close();page=await context.newPage();watch(page);await page.clock.setFixedTime(new Date(2026,8,29,9));await page.goto(url);await ready();
   assert.equal(await page.locator('html').getAttribute('data-glass-mode'),'partial');assert.deepEqual(await stored(),adjusted);await appearance();await hiddenMode();
-  pass('调整底栏参数后仍保留原 full 偏好，刷新与重新打开页面保留课表、教材、背景和休假');
+  pass('调整性能参数后仍保留原 full 偏好，刷新与重新打开页面保留课表、教材、背景和休假');
 
   await seed({glass:true,glassMode:'full',mode:'dark',scale:1.1});await page.setViewportSize({width:320,height:640});await page.emulateMedia({reducedMotion:'reduce'});
   await goTab(page,'设置');await page.locator('[data-setting="about"]').click();await page.getByRole('button',{name:/重新.*引导|再次.*引导|使用引导/}).click();
@@ -95,7 +95,7 @@ try{
     for(const action of sample.actions){assert.ok(action.x>=sample.dialog.x&&action.right<=sample.dialog.right+1);assert.ok(action.y>=sample.dialog.y&&action.bottom<=sample.dialog.bottom+1,`${action.name} 必须完整显示`);assert.ok(action.height>=40);}
     assert.doesNotMatch(await page.locator('.onboarding').innerText(),/关闭、部分或完全|全界面/);if(step<3)await nextGuide();
   }
-  assert.match(await page.locator('.onboarding').innerText(),/背景毛玻璃与底栏质感/);assert.equal(await page.locator('dialog[open]').evaluate(el=>getComputedStyle(el).animationName),'none');
+  assert.match(await page.locator('.onboarding').innerText(),/背景毛玻璃/);assert.equal(await page.locator('dialog[open]').evaluate(el=>getComputedStyle(el).animationName),'none');
   await page.locator('.onboarding-panel').evaluate(panel=>panel.scrollTop=panel.scrollHeight);await settled();await page.screenshot({path:`build/evidence/${version}-master-guide-narrow.png`});await page.getByRole('button',{name:'先逛一逛',exact:true}).click();await page.locator('.onboarding').waitFor({state:'hidden'});assert.deepEqual(await stored(),guideBefore);
   pass('320×640、110% 深色窄屏引导描述可见设置，全部主操作完整且重看不改原数据');
 

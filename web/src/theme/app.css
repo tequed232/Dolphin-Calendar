@@ -18,15 +18,14 @@ svg{flex-shrink:0}
 small{line-height:1.6}
 button:active{filter:brightness(.94)}
 .filter-defs{position:absolute;width:0;height:0;pointer-events:none}
-.app-shell{position:relative;height:var(--native-height,100%);width:100%;max-width:600px;margin:auto;background:var(--canvas);isolation:isolate}
+.app-shell{position:relative;height:var(--native-height,100%);width:100%;max-width:none;margin:auto;background:var(--canvas);isolation:isolate}
 .screen-host{position:absolute;inset:0 0 var(--keyboard-height) 0;overflow:hidden}
 [data-keyboard='true'] .screen{padding-bottom:30px;scroll-padding-top:calc(var(--safe-top) + 12px);scroll-padding-bottom:16px}
 [data-keyboard='true'] .floating-actions{visibility:hidden}
 .screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:calc(var(--safe-top) + 20px) var(--page-gutter) var(--page-bottom);visibility:hidden;pointer-events:none;transform:translateZ(0);will-change:transform;scrollbar-width:thin;scrollbar-color:var(--line) transparent;contain:layout style}
 .screen.active{visibility:visible;pointer-events:auto;z-index:2}
 .app-shell{--page-bottom:calc(var(--safe-bottom) + 24px);--task-bottom:calc(var(--safe-bottom) + 18px)}
-.app-shell[data-has-dock=true]{--page-bottom:calc(var(--dock-band) + 24px)}
-.tab-screen{padding-bottom:calc(var(--dock-band) + 24px);scroll-padding-bottom:calc(var(--dock-band) + 24px)}
+.tab-screen{scroll-padding-bottom:24px}
 .sub-screen{padding-bottom:var(--task-bottom);scroll-padding-bottom:var(--task-bottom)}
 .screen[aria-hidden=true]{pointer-events:none}
 .home-inner,.page-inner{zoom:var(--ui-scale);min-width:0}
@@ -91,7 +90,7 @@ button:active{filter:brightness(.94)}
 .free-period.continuation{font-size:11px;color:var(--muted)}
 .day-end{text-align:center;font-size:12px;color:var(--muted);margin:25px 0 0}
 .day-end>span{display:block;font-size:9px;letter-spacing:2px;margin-top:4px;opacity:.6}
-.floating-actions{position:absolute;left:var(--page-gutter);right:var(--page-gutter);bottom:calc(var(--dock-band) + 17px);display:flex;justify-content:flex-end;align-items:center;z-index:19;pointer-events:none}
+.floating-actions{position:absolute;left:var(--page-gutter);right:var(--page-gutter);bottom:calc(max(var(--navigation-bottom,0px),var(--safe-bottom),var(--keyboard-height)) + 18px);display:flex;justify-content:flex-end;align-items:center;z-index:19;pointer-events:none}
 .floating-actions button{pointer-events:auto}
 .lyrics-disclosure{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;padding:12px 0;color:var(--ink)}
 .lyrics-disclosure span{display:flex;flex-direction:column;gap:3px}
@@ -269,7 +268,7 @@ mark{background:var(--accent-soft);color:var(--accent);border-radius:3px}
 .library-book{padding:14px}
 .library-book .book-card{padding:0;border:0}
 .notes{background:var(--surface);border-radius:18px;padding:16px;font-size:14px;margin-top:20px;white-space:pre-wrap}
-.toast{position:fixed;z-index:100;bottom:calc(var(--dock-band) + 18px);left:50%;transform:translateX(-50%);max-width:min(90vw,480px);width:max-content;padding:13px 20px;background:var(--ink);color:var(--canvas);border-radius:20px;box-shadow:0 4px 20px #0002;font-size:14px;line-height:1.8;pointer-events:none}
+.toast{position:fixed;z-index:100;bottom:calc(max(var(--navigation-bottom,0px),var(--safe-bottom),var(--keyboard-height)) + 18px);left:50%;transform:translateX(-50%);max-width:min(90vw,480px);width:max-content;padding:13px 20px;background:var(--ink);color:var(--canvas);border-radius:20px;box-shadow:0 4px 20px #0002;font-size:14px;line-height:1.8;pointer-events:none}
 .load-note{position:absolute;top:10px;left:20px;font-size:10px;color:var(--muted)}
 dialog{border:0;background:var(--surface);color:var(--ink);border-radius:28px;padding:0;width:calc(100% - 32px);max-width:450px;max-height:calc(var(--native-height,100dvh) - var(--safe-top) - max(var(--safe-bottom),var(--keyboard-height)) - 28px);box-shadow:0 20px 80px #0003;overscroll-behavior:contain}
 [data-keyboard='true'] dialog{margin:calc(var(--safe-top) + 14px) auto 0;scroll-padding:16px}
@@ -364,48 +363,12 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:.8}
 .dialog-heading .icon-button,.sheet-title .icon-button{background:var(--soft);color:var(--muted)}
 .import-entry strong{font-size:17px}
 
-/* Stable glass sampling; the liquid silhouette and magnified foreground are independent. */
-.dock{position:absolute;bottom:calc(var(--safe-bottom) + var(--dock-offset));left:20px;right:20px;z-index:20;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));height:var(--dock-height);border-radius:38px;border:1px solid var(--glass-border);background:transparent;box-shadow:0 8px 30px #122d3617,0 1px 4px #122d3608;isolation:isolate;touch-action:none}
-.dock::before{content:'';position:absolute;inset:0;border-radius:inherit;z-index:-1;pointer-events:none;background:var(--glass-tint);backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturation));box-shadow:inset 0 1px 1px rgb(255 255 255 / var(--glass-highlight)),inset 0 -1px 1px #122d360c}
-[data-refraction=false] .dock::before{backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturation))}
-[data-refraction=false] .dock-droplet-window{backdrop-filter:blur(1.2px) saturate(1.04)!important}
-.dock>button{display:flex;align-items:center;justify-content:center;position:relative;color:var(--muted);padding:0;border-radius:38px;z-index:3;font-size:11px;font-weight:550}
-.dock>button:active{filter:none}
-.dock-content{white-space:nowrap;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transform-origin:50% 60%;pointer-events:none}
-.dock[data-dragging=true] .dock-content{will-change:transform}
-.dock-icon{width:32px;height:27px;display:grid;place-items:center}
-.dock>button[aria-current=page]{color:var(--muted);font-weight:550}
-.dock[data-preview='0']>button:nth-of-type(1),.dock[data-preview='1']>button:nth-of-type(2),.dock[data-preview='2']>button:nth-of-type(3),.dock[data-preview='3']>button:nth-of-type(4){color:var(--accent);font-weight:700}
-.dock-motion-layer{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;z-index:2}
-.dock-droplet{position:absolute;top:0;left:0;width:var(--drop-width,96px);height:64px;pointer-events:none;will-change:transform;--drop-inset-x:12px;--drop-inset-y:6px;--drop-press:0}
-.dock-droplet-clip{position:absolute;inset:var(--drop-inset-y) var(--drop-inset-x);border-radius:var(--drop-radius,16px)}
-/* 定位父层不生成 backdrop root；固定采样层用缓存的 alpha 轮廓裁切。
-   Android Chromium 的 SVG backdrop + clip-path 会泄漏矩形，mask 在合成末端限制输出。 */
-.dock-droplet-window{position:absolute;left:calc(0px - var(--drop-inset-x));top:calc(0px - var(--drop-inset-y));width:var(--drop-width,96px);height:64px;mask-image:var(--drop-mask);mask-size:100% 100%;mask-repeat:no-repeat;background:var(--glass-drop-tint);backdrop-filter:blur(1.2px) saturate(1.04)}
-.dock-droplet-glass{display:none}
-.dock[data-droplet-ready=true] .dock-droplet-window{backdrop-filter:url(#glass-droplet);background:none}
-.dock-droplet-rim{position:absolute;inset:var(--drop-inset-y) var(--drop-inset-x);border-radius:var(--drop-radius,16px);border:1px solid var(--glass-rim);box-shadow:inset 0 1px 2px #ffffff70,inset 0 -1px 2px #284d6120,0 3px 9px #234b5814;background:linear-gradient(150deg,#ffffff20,transparent 46%,#c6eeff12)}
-[data-glass=false] .dock::before{backdrop-filter:none;background:var(--surface)}
-[data-glass=false] .dock{border-color:var(--line);box-shadow:0 5px 20px #122d360c}
-[data-glass=false] .dock-droplet-window{backdrop-filter:none;background:var(--accent-soft)}
-[data-glass=false] .dock-droplet-rim{border-color:var(--line);box-shadow:none;background:none}
-:where([data-performance=reduced][data-glass=true]) .dock::before{backdrop-filter:none}
-:where([data-performance=reduced][data-glass=true][data-refraction=true]) .dock[data-droplet-ready=true] .dock-droplet-window{backdrop-filter:blur(1px)}
-.gesturing .dock,.gesturing .dock::before{backdrop-filter:none;filter:none;background:var(--surface)}
-.gesturing .dock-droplet-window{backdrop-filter:none;filter:none}
-@media(min-width:700px){.dock{left:38px;right:38px}}
 @media(max-width:340px){
  :root{--page-gutter:16px}
- .dock{left:12px;right:12px}
  .date-title{font-size:12px;padding-left:0}
  .week-controls .text-button{font-size:11px;padding:0 2px}
  .date-panel{padding-left:8px;padding-right:8px}
  .form-card{padding:16px}
  .setting-entry{padding-left:13px;padding-right:13px;gap:10px}
  .profile-card{padding:16px 14px;gap:11px}
-}
-@media(prefers-reduced-transparency:reduce){
- .dock::before,.dock-droplet-window{backdrop-filter:none!important;background:var(--surface)!important}
- .dock-droplet-window{background:var(--accent-soft)!important}
- .dock-tether path{fill:var(--accent-soft)}
 }

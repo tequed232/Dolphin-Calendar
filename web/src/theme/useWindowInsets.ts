@@ -1,6 +1,6 @@
 import {useEffect} from 'react';
 
-/** Dock follows the window; editable content follows the keyboard's visible area. */
+/** Content follows the keyboard's visible area; native navigation reports its own space. */
 export function useWindowInsets(){
   useEffect(()=>{
     const root=document.documentElement;

@@ -27,8 +27,9 @@ async function next(page){await page.getByRole('button',{name:'继续',exact:tru
 async function finalStep(page){await next(page);await next(page);await page.locator('.onboarding[data-step="3"]').waitFor();}
 async function stored(page){return page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('dolphin-calendar',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});const data=await new Promise((resolve,reject)=>{const r=db.transaction('state').objectStore('state').get('app');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});db.close();return data;});}
 async function assertNoPermission(page){
-  // updateStatus reads cached metadata only; it cannot request a permission or start a download.
-  const messages=await page.evaluate(()=>window.__guideNative),allowed=new Set(['ready','appearance','sync','bookCovers','haptic','history','updateStatus']);
+  // updateStatus reads cached metadata only; navigationState only synchronizes the native navigation UI.
+  // Neither can request a permission, read a calendar or start a download/live service.
+  const messages=await page.evaluate(()=>window.__guideNative),allowed=new Set(['ready','appearance','sync','bookCovers','haptic','history','updateStatus','navigationState']);
   assert.deepEqual(messages.filter(message=>!allowed.has(message.type)),[],'引导或快捷设置入口不应申请权限、读取日历或启动实时服务');
   assert.deepEqual(await page.evaluate(()=>window.__guideRejections),[]);
 }
@@ -53,7 +54,7 @@ try{
   assert.equal(await page.locator('.onboarding').getAttribute('data-step'),'2');pass('连续点击继续只前进一步，不会跳过引导内容');
   assert.match(await page.locator('.onboarding').innerText(),/选择日期/);assert.match(await page.locator('.onboarding').innerText(),/对应楼栋/);
   await page.getByRole('button',{name:'上一步',exact:true}).click();await page.waitForTimeout(220);assert.equal(await page.locator('.onboarding').getAttribute('data-step'),'1');
-  await finalStep(page);assert.match(await page.locator('.onboarding').innerText(),/我到了.*收起/);assert.match(await page.locator('.onboarding').innerText(),/背景毛玻璃与底栏质感/);assert.doesNotMatch(await page.locator('.onboarding').innerText(),/关闭、部分或完全/);pass('步骤可前后切换，日期、导航、实时状态与当前可见外观设置均有说明');
+  await finalStep(page);assert.match(await page.locator('.onboarding').innerText(),/我到了.*收起/);assert.match(await page.locator('.onboarding').innerText(),/背景毛玻璃/);assert.doesNotMatch(await page.locator('.onboarding').innerText(),/关闭、部分或完全/);pass('步骤可前后切换，日期、导航、实时状态与当前可见外观设置均有说明');
   await assertNoPermission(page);pass('完整引导不申请权限，不读取日历，不启动提醒或导航服务');
   await page.getByRole('button',{name:'先逛一逛',exact:true}).click();await page.locator('.onboarding').waitFor({state:'hidden'});assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'list');
   const skipped=await stored(page);assert.equal(skipped.onboarded,true);assert.deepEqual(skipped.schedule.courses,[]);

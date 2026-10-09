@@ -1,6 +1,6 @@
 # Dolphin Calendar · Codex 开发交接
 
-更新日期：2026-10-08。此文档对应本次 1.4.3 开发快照，不代表这些改动已经进入线上 Release。
+当前版本：1.4.5（2026-10-10）。当前导航、界面及源码范围见 [UI_1.4.5.md](UI_1.4.5.md)，发布状态见 STATUS.md。以下交接正文来自 1.4.3 开发快照；其中旧 Dock 设计约束和待提交状态属于历史背景，已由本轮实体导航要求替代。
 
 ## 接手时先做什么
 
@@ -48,7 +48,7 @@
 | 课表管理 / 配置 | web/src/screens/ScheduleManagement.tsx、ScheduleSettings.tsx |
 | 统一导入流程 | web/src/screens/Import.tsx、web/src/components/FileImport.tsx、ImportSteps.tsx |
 | 设置与外观开关 | web/src/screens/Settings.tsx |
-| 导航、安全区、Dock | web/src/App.tsx、web/src/nav/useNavigation.ts、web/src/components/GlassDock.tsx |
+| 当前导航与安全区 | web/src/App.tsx、web/src/nav/useNavigation.ts、web/src/nav/usePrimaryNavigation.ts、web/src/components/PrimaryNavigation.tsx、app/src/main/java/com/dolphin/calendar/NativeNavigationView.kt |
 | 样式 | web/src/theme/app.css、liquid.css、timetable.css |
 
 单一来源：`Schedule.periods` 决定每日节数、上课 / 下课 / 午休；学期日期、周数和课程属于当前 Schedule。不要给 Home、Settings、Import、CourseEditor 各建一份同类状态。旧偏好缺少时间线字段默认开启；已有关闭值保留。

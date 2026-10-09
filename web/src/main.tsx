@@ -8,6 +8,7 @@ import './theme/page-structure.css';
 import './theme/experience.css';
 import {AppProvider} from './state/AppState';
 import {App} from './App';
+import './theme/responsive-navigation.css';
 createRoot(document.getElementById('root')!).render(<AppProvider><App/></AppProvider>);
 // APK 已打包全部资源，不注册网页离线缓存，避免覆盖安装后旧缓存截住新构建。
 if(window.Dolphin) navigator.serviceWorker?.getRegistrations().then(registrations=>{for(const registration of registrations)void registration.unregister();}).catch(()=>{});

@@ -1,3 +1,5 @@
+// HISTORICAL: transparent Dock/glass flow. Checkout the relevant old tag to reproduce.
+// 1.4.5 uses check-native-navigation.mjs, check-responsive-navigation.mjs and current business CI.
 import {goTab,pasteJSON} from './check-navigation.mjs';
 import assert from 'node:assert/strict';
 import {execFileSync,spawn} from 'node:child_process';

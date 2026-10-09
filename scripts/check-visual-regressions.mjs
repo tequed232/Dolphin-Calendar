@@ -10,46 +10,8 @@ try{
   await mkdir('build/evidence',{recursive:true});
   await page.goto(process.env.TEST_URL??'http://127.0.0.1:5173');
   await page.getByRole('button',{name:'先逛一逛',exact:true}).click();
-  await page.locator('.dock[data-droplet-ready=true]').waitFor();
-  const style=await page.addStyleTag({content:'.dock-droplet-rim{visibility:hidden!important}'});
-  await page.evaluate(()=>{
-    document.documentElement.dataset.performance='full';
-    const pattern=document.createElement('div');pattern.id='pixel-grid';
-    Object.assign(pattern.style,{position:'absolute',inset:'auto 0 0',height:'120px',zIndex:'19',background:'repeating-linear-gradient(90deg,#fa4620 0 5px,#2855d0 5px 10px,#fff 10px 15px)'});
-    document.querySelector('.app-shell').append(pattern);
-  });
-  const dock=page.locator('.dock'),clip=page.locator('.dock-droplet-clip');
-  async function spill(){
-    const bounds=await dock.boundingBox(),capsule=await clip.boundingBox();
-    const visible=await dock.screenshot();
-    await clip.evaluate(e=>e.style.visibility='hidden');const hidden=await dock.screenshot();
-    await clip.evaluate(e=>e.style.removeProperty('visibility'));
-    await writeFile('build/evidence/clip-visible.png',visible);await writeFile('build/evidence/clip-hidden.png',hidden);await writeFile('build/evidence/clip-bounds.json',JSON.stringify({bounds,capsule}));
-    return page.evaluate(async({images,bounds,capsule})=>{
-      const decoded=await Promise.all(images.map(async src=>{const img=new Image();img.src=src;await img.decode();const canvas=document.createElement('canvas');canvas.width=img.width;canvas.height=img.height;const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0);return {w:img.width,h:img.height,p:ctx.getImageData(0,0,img.width,img.height).data};}));
-      let outside=0,inside=0;const [a,b]=decoded,ratio=a.w/bounds.width,cx=capsule.x-bounds.x+capsule.width/2,cy=capsule.y-bounds.y+capsule.height/2,r=capsule.height/2;
-      for(let y=0;y<a.h;y++)for(let x=0;x<a.w;x++){
-        const i=(y*a.w+x)*4,delta=Math.abs(a.p[i]-b.p[i])+Math.abs(a.p[i+1]-b.p[i+1])+Math.abs(a.p[i+2]-b.p[i+2]);
-        if(delta<12)continue;
-        const dx=Math.max(Math.abs((x+.5)/ratio-cx)-(capsule.width/2-r),0),dy=Math.abs((y+.5)/ratio-cy),distance=Math.hypot(dx,dy)-r;
-        if(distance>2)outside++;else if(distance<-2)inside++;
-      }
-      return {outside,inside};
-    },{images:[visible,hidden].map(x=>'data:image/png;base64,'+x.toString('base64')),bounds,capsule});
-  }
-  const bounds=await dock.boundingBox();
-  for(const mode of ['light','dark']){
-    await page.locator('html').evaluate((e,mode)=>{e.dataset.mode=mode;e.dataset.performance='full';},mode);
-    await page.mouse.move(bounds.x+bounds.width/6,bounds.y+bounds.height/2);await page.mouse.down();
-    await page.mouse.move(bounds.x+bounds.width*.56,bounds.y+bounds.height/2,{steps:8});await page.waitForTimeout(750);
-    const pixels=await spill();assert.ok(pixels.inside>100,`${mode}: glass must change real background pixels`);assert.equal(pixels.outside,0,`${mode}: rectangle leaked outside the rounded capsule`);
-    results.push({mode,...pixels});
-    await page.mouse.up();await page.waitForTimeout(500);
-    const idle=await spill();assert.equal(idle.outside,0,`${mode}: idle capsule leaked`);results.push({mode:mode+'-idle',...idle});
-  }
-  // Deliberately remove clipping: the pixel test must catch the old rectangular surface.
-  await page.locator('.dock-droplet-window').evaluate(e=>e.style.maskImage='none');const broken=await spill();assert.ok(broken.outside>80,'pixel guard must reject missing round clipping');await page.locator('.dock-droplet-window').evaluate(e=>e.style.removeProperty('mask-image'));
-  await style.evaluate(e=>e.remove());await page.evaluate(()=>document.getElementById('pixel-grid').remove());
+  assert.equal(await page.locator('.dock,#glass-droplet').count(),0);
+  const host=await page.locator('.screen-host').boundingBox(),navigation=await page.locator('.primary-navigation').boundingBox();assert.ok(host.y+host.height<=navigation.y+1);results.push({solidNavigation:true,contentReserved:true});
   await goTab(page,'设置');await page.locator('[data-setting="appearance"]').click();await page.waitForTimeout(350);
   assert.equal(await page.locator('#contour-background').count(),0);
   assert.equal(await page.locator('.app-background').evaluate(e=>getComputedStyle(e).position),'absolute');
@@ -77,6 +39,6 @@ try{
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.evaluate(()=>window.dolphinBack('back'));await page.waitForTimeout(100);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),'settings');
   await goTab(page,'列表');await page.locator('html').evaluate(e=>e.dataset.mode='dark');await page.screenshot({path:`build/evidence/${version}-home-dark.png`});
-  await writeFile(`build/evidence/${version}-visual-results.json`,JSON.stringify({version,capsule:results,unclippedMutation:broken,fade,fixedBackground:true,interruptedBackSafe:true,reducedMotion:true},null,2));
-  console.log('PASS rounded backdrop pixels in light/dark, unclipped mutation rejected, continuous fade, interruption, reduced motion, fixed background');
+  await writeFile(`build/evidence/${version}-visual-results.json`,JSON.stringify({version,navigation:results,fade,fixedBackground:true,interruptedBackSafe:true,reducedMotion:true},null,2));
+  console.log('PASS solid navigation reserves content, continuous fade, interruption, reduced motion, fixed background');
 }finally{await browser.close();}

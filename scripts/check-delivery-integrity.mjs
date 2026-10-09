@@ -1,8 +1,8 @@
-import {readFileSync} from 'node:fs';
+import {readFileSync,existsSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 // SHA-256 baseline from the supplied 2026-10-08 delivery source.
-// Only release metadata in meta.ts may differ; line endings are normalized.
+// Historical hashes remain unchanged. 1.4.5 allows only the explicit reviewed UI paths below.
 const expected={
   "app/src/main/AndroidManifest.xml": "d09e1b0bfadd1039b2d2ce6f3bcd687414447fc4fe5ef1eefa11354bebd747d3",
   "app/src/main/java/com/dolphin/calendar/AppUpdates.kt": "29cf6c529480d16c9b61d0172db5d9c8ce3170f66cfd72bbf2c83fc872025558",
@@ -128,9 +128,38 @@ const expected={
   "web/src/theme/useWindowInsets.ts": "b0f61d60cd9a3b9c7ce686d308f1b7330bde0eaaa6092d70f46846184ee530e8",
   "web/src/vite-env.d.ts": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
 };
+// Scope allowance, not a new hash baseline. Unlisted business files remain frozen.
+// Mixed UI/bridge files require review plus behavior checks.
+const reviewedUI={
+ "app/src/main/java/com/dolphin/calendar/MainActivity.kt":"Native navigation host and viewport bridge",
+ "web/src/App.tsx":"Primary navigation and overlay visibility",
+ "web/src/components/CalendarPicker.tsx":"Continuous month/year navigation",
+ "web/src/components/Dialog.tsx":"Root portal prevents nested UI zoom and clipping",
+ "web/src/components/GlassDock.tsx":"Retired transparent Dock component",
+ "web/src/components/Onboarding.tsx":"Current display guidance",
+ "web/src/lib/native.ts":"Native navigation protocol",
+ "web/src/main.tsx":"Responsive navigation stylesheet entry",
+ "web/src/screens/Background.tsx":"Four-item solid navigation preview",
+ "web/src/screens/Home.tsx":"In-flow toolbar and reading viewport",
+ "web/src/screens/Settings.tsx":"Retire obsolete Dock controls",
+ "web/src/state/useHomeFocus.ts":"Reading focus within reserved viewport",
+ "web/src/theme/app.css":"Retire Dock styles and reserve content",
+ "web/src/theme/background.css":"Solid navigation preview",
+ "web/src/theme/calendar.css":"Sliding month/year presentation",
+ "web/src/theme/timetable.css":"Toolbar normal flow",
+ "web/src/theme/useWindowInsets.ts":"Document keyboard/navigation behavior"
+};
+const changed=[],unchanged=[];
 for(const [file,sha] of Object.entries(expected)){
+ if(!existsSync(file)){
+  assert.equal(file,'web/src/components/GlassDock.tsx','交付包源码未经允许删除：'+file);
+  changed.push({file,status:'removed',reason:reviewedUI[file]});continue;
+ }
  let bytes=readFileSync(file);
- if(/\.(ts|tsx|css|kt|java|xml|json|svg)$/.test(file)){let text=bytes.toString('utf8').replaceAll('\r\n','\n');if(file==='web/src/meta.ts')text=text.replace(/APP_VERSION = '[^']+'/,"APP_VERSION = '1.4.3'");bytes=Buffer.from(text);}
- assert.equal(createHash('sha256').update(bytes).digest('hex'),sha,'交付包功能实现发生变化：'+file);
+ if(/\.(ts|tsx|css|kt|java|xml|json|svg)$/.test(file)){let source=bytes.toString('utf8').replaceAll('\r\n','\n');if(file==='web/src/meta.ts')source=source.replace(/APP_VERSION = '[^']+'/,"APP_VERSION = '1.4.3'");bytes=Buffer.from(source);}
+ const actual=createHash('sha256').update(bytes).digest('hex');
+ if(actual!==sha){assert.ok(reviewedUI[file],'未获本轮 UI 修改授权的交付包核心文件发生变化：'+file);changed.push({file,status:'modified',reason:reviewedUI[file]});}
+ else unchanged.push(file);
 }
-console.log('PASS 交付包源码一致性：'+Object.keys(expected).length+' 个应用源码/资源文件，仅允许发行版本元数据变化。');
+console.log('PASS 历史交付包基线保留：'+Object.keys(expected).length+' 个文件；'+unchanged.length+' 个仍完全一致，'+changed.length+' 个已列明 UI 变更。');
+for(const item of changed)console.log('REVIEWED UI '+item.status+' '+item.file+' — '+item.reason);
