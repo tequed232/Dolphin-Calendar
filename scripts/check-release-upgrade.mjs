@@ -52,6 +52,12 @@ async function retainedFixture(ui,stage){
   assert.ok(ui.some(n=>n.text.includes(course)&&n.bounds!=='[0,0][0,0]'),'Seeded course missing');capture(`${stage}-saved-course`);
   tapText(ui,'列表');return waitFor(nodes=>nodes.some(n=>n.text===term));
 }
+async function capturePreferences(ui,stage){
+  tapText(ui,'设置');ui=await waitFor(nodes=>nodes.some(n=>n.text.startsWith('外观 ')&&n.class==='android.widget.Button'));
+  tapNode(ui,n=>n.text.startsWith('外观 ')&&n.class==='android.widget.Button');
+  ui=await waitFor(nodes=>nodes.some(n=>n.text==='界面缩放'));capture(`${stage}-preferences`);
+  return `${prefix}-${stage}-preferences.png`;
+}
 try{
   let ui;
   if(args.resume){
@@ -59,6 +65,7 @@ try{
     assert.equal(previous.apkSHA256,report.apkSHA256,'Resume must verify the exact APK already installed');
     assert.equal(previous.before.versionCode,expectedBefore);assert.equal(previous.after.versionCode,expectedAfter);assert.match(previous.installOutput,/Success/);
     report.before=previous.before;report.installOutput=previous.installOutput;
+    report.installedBeforeApkSHA256=previous.installedBeforeApkSHA256;report.preferences=previous.preferences;
     report.resumedVerification={report:path.resolve(args.resume),previousStatus:previous.status,previousError:previous.error};
     results.push(...previous.results);
   }else{
@@ -66,6 +73,8 @@ try{
     const installedPath=run('shell','pm','path',pkg).split('\n').find(line=>line.startsWith('package:'))?.slice(8);
     if(installedPath)report.installedBeforeApkSHA256=run('shell','sha256sum',installedPath).split(/\s+/)[0];
     ui=await retainedFixture(await launch(),'before');pass('previous release cold-start reads the UI-imported synthetic course and term');
+    report.preferences={validation:'Screenshots require visual inspection: selected values are painted inside custom HTML buttons and are absent from the Android accessibility tree.',beforeScreenshot:await capturePreferences(ui,'before'),expected:['深色 · 夜航','110%']};
+    pass('previous release opens the retained appearance preferences for a current pre-upgrade visual baseline');
     report.installOutput=run('install','-r',apk);assert.match(report.installOutput,/Success/);pass('adb install -r succeeds without uninstall or data clearing');
   }
   report.after=packageInfo();assert.equal(report.after.versionCode,expectedAfter);
@@ -85,9 +94,7 @@ try{
     if(tab==='列表')for(let attempt=0;attempt<4;attempt++)run('shell','input','swipe','650','600','650','1850','350');
     ui=await waitFor(nodes=>nodes.some(n=>expected.test(n.text)&&n.bounds!=='[0,0][0,0]')&&(expectedAfter<10405||nodes.some(n=>n['content-desc']===tab&&n.class==='android.widget.Button'&&n.selected==='true')));capture(`after-${name}`);pass(`navigate to ${tab} in the release APK and verify its page content`);
   }
-  tapText(ui,'设置');ui=await waitFor(nodes=>nodes.some(n=>n.text.startsWith('外观 ')&&n.class==='android.widget.Button'));
-  tapNode(ui,n=>n.text.startsWith('外观 ')&&n.class==='android.widget.Button');ui=await waitFor(nodes=>nodes.some(n=>n.text==='界面缩放'));capture('after-preferences');
-  report.preferences={validation:'Screenshots require visual inspection: selected values are painted inside custom HTML buttons and are absent from the Android accessibility tree.',beforeScreenshot:'1.4.4-upgrade-before-preferences.png',afterScreenshot:`${prefix}-after-preferences.png`,expected:['深色 · 夜航','110%']};
+  report.preferences={...report.preferences,validation:'Screenshots require visual inspection: selected values are painted inside custom HTML buttons and are absent from the Android accessibility tree.',afterScreenshot:await capturePreferences(ui,'after'),expected:['深色 · 夜航','110%']};
   pass('upgraded APK opens the saved appearance preferences (selected values captured for visual review)');
   report.status='passed';
 }catch(error){report.status='failed';report.error=error.stack;throw error;}

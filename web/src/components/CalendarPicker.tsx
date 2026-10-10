@@ -8,7 +8,7 @@ import type {HolidayMark} from '../lib/holidays';
 const firstMonth=(date:Date)=>new Date(date.getFullYear(),date.getMonth(),1,12);
 const monthAt=(month:Date,amount:number)=>new Date(month.getFullYear(),month.getMonth()+amount,1,12);
 const allowed=(month:Date)=>month.getFullYear()>=1900&&month.getFullYear()<=9999;
-type Drag={id:number;x:number;y:number;width:number;lastX:number;lastTime:number;speed:number;axis:'pending'|'horizontal'|'vertical';offset:number};
+type Drag={id:number;x:number;y:number;width:number;gestureWidth?:number;lastX:number;lastTime:number;speed:number;axis:'pending'|'horizontal'|'vertical';offset:number};
 type Motion={frame:number;nextFrame:number;timer:number;busy:boolean};
 function stopMotion(state:Motion){cancelAnimationFrame(state.frame);cancelAnimationFrame(state.nextFrame);window.clearTimeout(state.timer);state.busy=false;}
 
@@ -66,8 +66,8 @@ export function CalendarPicker({selected,schedule,onSelect,onClose,holidayFor,pu
     else settle(state.offset);
   }
   function startYearDrag(event:ReactPointerEvent<HTMLDivElement>){
-    if(yearAnimation.current.busy||!event.isPrimary||(event.pointerType==='mouse'&&event.button!==0))return;
-    const box=event.currentTarget.getBoundingClientRect();yearDrag.current={id:event.pointerId,x:event.clientX,y:event.clientY,width:box.width,lastX:event.clientX,lastTime:event.timeStamp,speed:0,axis:'pending',offset:0};
+    if((event.target as HTMLElement).closest('input,button')||yearAnimation.current.busy||!event.isPrimary||(event.pointerType==='mouse'&&event.button!==0))return;
+    const box=event.currentTarget.querySelector('.calendar-year-window')!.getBoundingClientRect();yearDrag.current={id:event.pointerId,x:event.clientX,y:event.clientY,width:box.width,gestureWidth:event.currentTarget.getBoundingClientRect().width,lastX:event.clientX,lastTime:event.timeStamp,speed:0,axis:'pending',offset:0};
   }
   function updateYearDrag(event:ReactPointerEvent<HTMLDivElement>){
     const state=yearDrag.current;if(!state||state.id!==event.pointerId)return;
@@ -87,7 +87,7 @@ export function CalendarPicker({selected,schedule,onSelect,onClose,holidayFor,pu
     const state=yearDrag.current;if(!state||state.id!==event.pointerId)return;yearDrag.current=null;if(state.axis!=='horizontal')return;
     if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
     const direction=state.offset<0?1:-1,next=month.getFullYear()+direction,distance=Math.abs(event.clientX-state.x),quick=distance>=24&&Math.abs(state.speed)>.45&&event.timeStamp-state.lastTime<100;
-    if(!cancel&&next>=1900&&next<=9999&&(Math.abs(state.offset)>=.2||quick))selectYear(next,state.offset+direction);
+    if(!cancel&&next>=1900&&next<=9999&&(distance/(state.gestureWidth??state.width)>=.2||quick))selectYear(next,state.offset+direction);
     else settle(state.offset,'year');
   }
   function panel(panelMonth:Date,current:boolean){
@@ -103,12 +103,14 @@ export function CalendarPicker({selected,schedule,onSelect,onClose,holidayFor,pu
       <div className="calendar-controls">
         <p className="calendar-explainer">{purpose==='import'?'点选开学日期，确认导入后生效。':choosingTerm?'点选开学日期，点击“保存课表设置”后生效。':'点选日期，查看那一天的课程。圆点表示当天有课。'}</p>
         <div className="calendar-toolbar"><button className="icon-button" aria-label="上个月" disabled={!allowed(monthAt(month,-1))} onClick={()=>move(-1)}><Icon name="back"/></button><button className="calendar-month" aria-expanded={jump} onClick={()=>setJump(v=>!v)}>{monthLabel}<Icon name="chevron" size={17}/></button><button className="icon-button" aria-label="下个月" disabled={!allowed(monthAt(month,1))} onClick={()=>move(1)}><Icon name="next"/></button></div>
-        {jump&&<div className="calendar-jump"><div className="calendar-year-row"><button className="icon-button" aria-label="上一年" disabled={month.getFullYear()===1900} onClick={()=>moveYear(-1)}><Icon name="back"/></button><label className="field">年份<input type="number" min={1900} max={9999} aria-label="日历年份" value={year} onChange={e=>setYear(e.target.value)} onBlur={jumpYear} onKeyDown={e=>{if(e.key==='Enter'){jumpYear();e.currentTarget.blur();}}}/></label><button className="icon-button" aria-label="下一年" disabled={month.getFullYear()===9999} onClick={()=>moveYear(1)}><Icon name="next"/></button></div><ChoiceSelect label="月份" value={String(month.getMonth())} options={Array.from({length:12},(_,i)=>({value:String(i),label:`${i+1} 月`}))} onChange={value=>selectMonth(new Date(validYear(),Number(value),1,12))}/>
-          <div className="calendar-year-swipe" tabIndex={0} role="group" aria-label="滑动切换年份" data-dragging={yearDragging||undefined} onPointerDown={startYearDrag} onPointerMove={updateYearDrag} onPointerUp={e=>finishYearDrag(e)} onPointerCancel={e=>finishYearDrag(e,true)} onLostPointerCapture={e=>{if(e.target===e.currentTarget&&yearDrag.current?.id===e.pointerId)finishYearDrag(e,true);}} onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();moveYear(e.key==='ArrowLeft'?-1:1);}}}>
-            <span className="calendar-year-swipe-arrow previous" aria-hidden="true"><Icon name="back" size={16}/></span>
-            <div className="calendar-year-track" data-animating={yearAnimating||undefined} style={{transform:`translate3d(${(-1+yearOffset)*100/3}%,0,0)`}}>{[-1,0,1].map(amount=><span className="calendar-year-slide" key={amount} aria-hidden={amount!==0||undefined}><strong>{month.getFullYear()+amount>=1900&&month.getFullYear()+amount<=9999?`${month.getFullYear()+amount} 年`:'—'}</strong><small>左右滑动切换年份</small></span>)}</div>
-            <span className="calendar-year-swipe-arrow next" aria-hidden="true"><Icon name="next" size={16}/></span>
+        {jump&&<div className="calendar-jump"><div className="field calendar-year-field"><span>年份</span>
+          <div className="calendar-year-swipe" tabIndex={0} role="group" aria-label="滑动切换年份" data-dragging={yearDragging||undefined} onPointerDown={startYearDrag} onPointerMove={updateYearDrag} onPointerUp={e=>finishYearDrag(e)} onPointerCancel={e=>finishYearDrag(e,true)} onLostPointerCapture={e=>{if(e.target===e.currentTarget&&yearDrag.current?.id===e.pointerId)finishYearDrag(e,true);}} onKeyDown={e=>{if(!(e.target as HTMLElement).closest('input,button')&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){e.preventDefault();moveYear(e.key==='ArrowLeft'?-1:1);}}}>
+            <div className="calendar-year-row"><button className="icon-button" aria-label="上一年" disabled={month.getFullYear()===1900} onClick={()=>moveYear(-1)}><Icon name="back"/></button>
+              <div className="calendar-year-window"><div className="calendar-year-track" data-animating={yearAnimating||undefined} style={{transform:`translate3d(${(-1+yearOffset)*100/3}%,0,0)`}}>{[-1,0,1].map(amount=><div className="calendar-year-slide" key={amount} aria-hidden={amount!==0||undefined}>{amount===0?<input type="number" min={1900} max={9999} aria-label="日历年份" value={year} onChange={e=>setYear(e.target.value)} onBlur={jumpYear} onKeyDown={e=>{if(e.key==='Enter'){jumpYear();e.currentTarget.blur();}}}/>:<strong>{month.getFullYear()+amount>=1900&&month.getFullYear()+amount<=9999?month.getFullYear()+amount:'—'}</strong>}</div>)}</div></div>
+              <button className="icon-button" aria-label="下一年" disabled={month.getFullYear()===9999} onClick={()=>moveYear(1)}><Icon name="next"/></button></div>
+            <small className="calendar-year-hint">左右滑动，点数字输入</small>
           </div>
+        </div><ChoiceSelect label="月份" value={String(month.getMonth())} options={Array.from({length:12},(_,i)=>({value:String(i),label:`${i+1} 月`}))} onChange={value=>selectMonth(new Date(validYear(),Number(value),1,12))}/>
         </div>}
         <p className="calendar-gesture-hint" id={hintId}>左右滑动切换月份，点击年月快速跳转。</p>
       </div>

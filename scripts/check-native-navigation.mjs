@@ -13,7 +13,8 @@ assert.ok(['com.dolphin.calendar','com.dolphin.calendar.debug'].includes(pkg));
 assert.ok(!cdp||pkg.endsWith('.debug'),'CDP is only available on the isolated debug package');
 assert.ok(!args.seed||(cdp&&pkg.endsWith('.debug')),'Seeding is limited to a fresh isolated debug package');
 const adbPath=args.adb??path.join(process.env.ANDROID_HOME??'D:/Android/Sdk','platform-tools',process.platform==='win32'?'adb.exe':'adb');
-const prefix=args.prefix??'1.4.5-native',course=args.course??'RetainedCourse10403';
+const version=readFileSync('web/src/meta.ts','utf8').match(/APP_VERSION\s*=\s*'([^']+)'/)[1];
+const prefix=args.prefix??`${version}-native`,course=args.course??'RetainedCourse10403';
 const output=path.resolve('build/evidence');mkdirSync(output,{recursive:true});
 const run=(...command)=>execFileSync(adbPath,['-s',serial,...command],{encoding:'utf8',timeout:60000,maxBuffer:4*1024*1024}).trim();
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -48,7 +49,8 @@ async function select(text,content){
   // Existing list/grid focus restoration may return midway through a page; scroll to its heading for proof.
   for(let attempt=0;content&&!ui.some(n=>content(n)&&visible(n))&&attempt<6;attempt++){
     const b=bounds(ui.find(n=>n.class==='android.webkit.WebView'&&visible(n))),x=Math.round((b[0]+b[2])*0.6),height=b[3]-b[1];
-    run('shell','input','swipe',String(x),String(Math.round(b[1]+height*.2)),String(x),String(Math.round(b[1]+height*.8)),'350');ui=dump();
+    // In landscape, the horizontal date strip may occupy the top fifth and intentionally reject vertical gestures.
+    run('shell','input','swipe',String(x),String(Math.round(b[1]+height*.45)),String(x),String(Math.round(b[1]+height*.85)),'350');ui=dump();
   }
   assert.ok(!content||ui.some(n=>content(n)&&visible(n)),'Web page content did not match the native selected destination');
   if(page)assert.equal(await page.locator('.tab-screen.active').getAttribute('data-screen'),({列表:'list',平铺:'grid',搜索:'search',设置:'settings'})[text]);
@@ -84,12 +86,14 @@ async function webGeometry(layout,ui){
   else {assert.ok(Math.abs(metrics.screen.left-first[2]/density)<2,'Web content must begin after the native rail');assert.ok(metrics.left>=88);}
   report.geometry[`${layout}Web`]=metrics;pass(`${layout} native occupancy matches actual WebView content bounds; no duplicate Web bar`);
 }
-async function actualSwipe(selector,direction){
-  const region=page.locator(selector);await region.scrollIntoViewIfNeeded();const box=await region.boundingBox();assert.ok(box);
-  const from=box.x+box.width*(direction==='left'?.82:.18),to=box.x+box.width*(direction==='left'?.18:.82),y=box.y+box.height*.5;
+async function actualSwipe(selector,direction,gestureContainer){
+  const region=typeof selector==='string'?page.locator(selector):selector;await region.scrollIntoViewIfNeeded();const box=await region.boundingBox();assert.ok(box);
+  const gestureBox=gestureContainer?await gestureContainer.boundingBox():box;assert.ok(gestureBox);
+  const from=box.x+box.width*(direction==='left'?.82:.18),to=gestureContainer?from+gestureBox.width*.6*(direction==='left'?-1:1):box.x+box.width*(direction==='left'?.18:.82),y=box.y+box.height*.5;
   run('shell','input','swipe',String(Math.round(from*density)),String(Math.round(y*density)),String(Math.round(to*density)),String(Math.round(y*density)),'320');
-  // Wait for the picker to complete its 200 ms page settlement before a second physical gesture.
-  await sleep(300);
+  // Start a year gesture on the hint, away from editable inputs, and allow the 200 ms settlement to finish.
+  await sleep(460);
+  return {direction,region:box,container:gestureBox,from:{x:from,y},to:{x:to,y},duration:320};
 }
 try{
   rotate(0);run('shell','am','force-stop',pkg);run('shell','am','start','-n',`${pkg}/com.dolphin.calendar.MainActivity`);
@@ -123,10 +127,15 @@ try{
     const monthButton=page.locator('.calendar-month'),initial=await monthButton.innerText(),match=initial.match(/(\d+)年(\d+)月/),year=Number(match[1]),month=Number(match[2]);
     await actualSwipe('.calendar-viewport','left');assert.equal(await monthButton.innerText(),`${month===12?year+1:year}年${month===12?1:month+1}月`);
     await actualSwipe('.calendar-viewport','right');assert.equal(await monthButton.innerText(),initial);pass('Physical Android month swipes change months in both directions without accidentally selecting a date');
-    await monthButton.click();const yearInput=page.getByLabel('日历年份',{exact:true}),initialYear=Number(await yearInput.inputValue());
-    await actualSwipe('.calendar-year-swipe','left');assert.equal(Number(await yearInput.inputValue()),initialYear+1);
-    await actualSwipe('.calendar-year-swipe','right');assert.equal(Number(await yearInput.inputValue()),initialYear);
-    ui=dump();assert.equal(nativeButtons(ui).length,0);capture('calendar-year-swiped');pass('Physical Android year-region swipes change years in both directions while native navigation stays hidden');
+    await monthButton.click();const yearControl=page.getByRole('group',{name:'滑动切换年份',exact:true}),yearInput=page.getByLabel('日历年份',{exact:true}),initialYear=Number(await yearInput.inputValue());
+    assert.equal(await page.locator('.calendar-year-field').count(),1);assert.equal(await yearControl.count(),1);assert.equal(await yearInput.count(),1);
+    assert.equal(await yearControl.getByRole('button',{name:'上一年',exact:true}).count(),1);assert.equal(await yearControl.getByRole('button',{name:'下一年',exact:true}).count(),1);
+    const yearHint=yearControl.locator('.calendar-year-hint');assert.equal(await yearHint.count(),1);
+    report.yearControl={inputs:1,previousButtons:1,nextButtons:1,initialYear,physicalGestures:[]};
+    report.yearControl.physicalGestures.push(await actualSwipe(yearHint,'left',yearControl));assert.equal(Number(await yearInput.inputValue()),initialYear+1);
+    ui=dump();capture('calendar-year-next');
+    report.yearControl.physicalGestures.push(await actualSwipe(yearHint,'right',yearControl));assert.equal(Number(await yearInput.inputValue()),initialYear);
+    ui=dump();assert.equal(nativeButtons(ui).length,0);capture('calendar-year-swiped');pass('A single year input/arrow/hint control supports physical Android swipes in both directions while native navigation stays hidden');
   }
   run('shell','input','keyevent','4');ui=await waitFor(ui=>nativeButtons(ui).length===4,'Calendar Back must return to the selected page');pass('Android Back dismisses the calendar and restores the selected page');
   rotate(1);ui=await waitFor(ui=>{const nav=nativeButtons(ui);return nav.length===4&&new Set(nav.map(n=>bounds(n)[0])).size===1;},'Landscape must use a native side rail');
@@ -135,6 +144,17 @@ try{
   report.geometry.rail=rail;capture('landscape');pass('Landscape switches to a real 88 dp native rail with four accessible ≥48 dp destinations');await webGeometry('rail',ui);
   for(const [text,heading] of [['平铺',n=>n.text==='平铺课表'||/^周[一二三四五六日]第\d+节添加临时课程$/.test(n.text)],['搜索',n=>n.text==='查找整个课表中的课程、教师或教室。'],['设置',n=>n.text==='管理课表，安排提醒，调整你的界面。'],['列表',n=>n.text==='选择日期']])await select(text,heading);
   pass('All four native rail destinations open their existing pages');
+  if(page){
+    await page.getByRole('button',{name:'选择日期',exact:true}).click();await page.locator('.calendar-month').click();
+    const control=page.getByRole('group',{name:'滑动切换年份',exact:true}),input=control.getByLabel('日历年份',{exact:true}),year=Number(await input.inputValue());
+    assert.equal(await control.count(),1);assert.equal(await input.count(),1);
+    await actualSwipe(control.locator('.calendar-year-hint'),'left',control);assert.equal(Number(await input.inputValue()),year+1);
+    await actualSwipe(control.locator('.calendar-year-hint'),'right',control);assert.equal(Number(await input.inputValue()),year);
+    ui=dump();assert.equal(nativeButtons(ui).length,0);capture('calendar-year-landscape');
+    await page.locator('.calendar-footer').getByRole('button',{name:'回到今天',exact:true}).click();ui=await waitFor(ui=>nativeButtons(ui).length===4,'Landscape calendar Today must restore the selected native rail');
+    assert.ok(nativeButtons(ui).some(n=>n['content-desc']==='列表'&&n.selected==='true'));
+    pass('Landscape single year control supports physical Android hint swipes and Today returns to the selected native rail');
+  }
   rotate(0);ui=await waitFor(ui=>{const nav=nativeButtons(ui);return nav.length===4&&new Set(nav.map(n=>bounds(n)[1])).size===1;},'Portrait must restore bottom navigation');pass('Rotating back restores the bottom bar and selected page');
   ui=await select('搜索',n=>n.text==='查找整个课表中的课程、教师或教室。');
   tap(ui.find(n=>n.class==='android.widget.Button'&&n.text.includes(course)&&visible(n)));

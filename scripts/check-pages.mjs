@@ -5,6 +5,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {launchBrowser} from './check-browser.mjs';
 
+const version=(await readFile('web/src/meta.ts','utf8')).match(/APP_VERSION\s*=\s*'([^']+)'/)[1];
 const root=path.resolve('build/pages'),prefix='/Dolphin-Calendar/';
 const html=await readFile(path.join(root,'index.html'),'utf8');
 assert.match(html,/<script type="module">/);
@@ -72,7 +73,7 @@ try{
   await page.reload();await goTab(page,'搜索');await page.locator('.screen.active .result-card').waitFor();
   await context.setOffline(true);await page.reload();await goTab(page,'搜索');await page.locator('.screen.active .result-card').waitFor();
   assert.deepEqual(misses,[]);assert.deepEqual(errors,[]);assert.ok(external.every(request=>request===releaseEndpoint),'仅允许产品明确实现的官方版本检查请求');
-  await mkdir('build/evidence',{recursive:true});await page.screenshot({path:'build/evidence/1.4.2-pages.png'});
-  await writeFile('build/evidence/1.4.2-pages-results.json',JSON.stringify({entry:'index.html',subdirectory:prefix,icons,imported:true,persisted:true,offline:true,scope,otherCachePreserved:true,misses,errors,external},null,2));
+  await mkdir('build/evidence',{recursive:true});await page.screenshot({path:`build/evidence/${version}-pages.png`});
+  await writeFile(`build/evidence/${version}-pages-results.json`,JSON.stringify({version,entry:'index.html',subdirectory:prefix,icons,imported:true,persisted:true,offline:true,scope,otherCachePreserved:true,misses,errors,external},null,2));
   console.log('PASS Pages index.html / 项目子目录资源 / JSON 导入与刷新 / 离线缓存隔离');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
