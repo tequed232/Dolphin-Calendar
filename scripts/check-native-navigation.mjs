@@ -7,10 +7,11 @@ import path from 'node:path';
 import {_android} from 'playwright';
 
 const args=Object.fromEntries(process.argv.slice(2).reduce((pairs,item,index,all)=>{if(item.startsWith('--'))pairs.push([item.slice(2),all[index+1]?.startsWith('--')?true:all[index+1]??true]);return pairs;},[]));
-const serial=args.serial??'emulator-5562',pkg=args.package??'com.dolphin.calendar',cdp=Boolean(args.cdp);
+const serial=args.serial??'emulator-5562',pkg=args.package??'com.dolphin.calendar',cdp=Boolean(args.cdp),layoutChecks=Boolean(args['layout-checks']);
 assert.match(serial,/^emulator-\d+$/,'Only the task emulator can be used');
 assert.ok(['com.dolphin.calendar','com.dolphin.calendar.debug'].includes(pkg));
 assert.ok(!cdp||pkg.endsWith('.debug'),'CDP is only available on the isolated debug package');
+assert.ok(!layoutChecks||cdp,'Compact layout checks require the isolated debug WebView');
 assert.ok(!args.seed||(cdp&&pkg.endsWith('.debug')),'Seeding is limited to a fresh isolated debug package');
 const adbPath=args.adb??path.join(process.env.ANDROID_HOME??'D:/Android/Sdk','platform-tools',process.platform==='win32'?'adb.exe':'adb');
 const version=readFileSync('web/src/meta.ts','utf8').match(/APP_VERSION\s*=\s*'([^']+)'/)[1];
@@ -95,6 +96,64 @@ async function actualSwipe(selector,direction,gestureContainer){
   await sleep(460);
   return {direction,region:box,container:gestureBox,from:{x:from,y},to:{x:to,y},duration:320};
 }
+async function storedLayoutState(){
+  return page.evaluate(()=>new Promise((resolve,reject)=>{
+    const request=indexedDB.open('dolphin-calendar',1);request.onerror=()=>reject(request.error);
+    request.onsuccess=()=>{const db=request.result,read=db.transaction('state','readonly').objectStore('state').get('app');read.onerror=()=>{db.close();reject(read.error);};read.onsuccess=()=>{const data=read.result;db.close();resolve({schedule:data.schedule,settings:data.settings,books:data.books});};};
+  }));
+}
+async function compactLayouts(){
+  const scale=1.1,before=await storedLayoutState(),shell=page.locator('.app-shell');
+  const original=await shell.evaluate(el=>({value:el.style.getPropertyValue('--ui-scale'),priority:el.style.getPropertyPriority('--ui-scale')}));
+  const layoutReport=report.compactLayout={at:new Date().toISOString(),version,serial,pkg,apkSHA256:report.apkSHA256,installedApkSHA256:report.installedApkSHA256,scale,scope:'Read existing synthetic fixture; temporarily apply CSS 110%; never edit time values or persist preferences.',checks:[],geometry:[],status:'running'};
+  const record=name=>{layoutReport.checks.push(name);pass(name);},hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  try{
+    await shell.evaluate((el,scale)=>el.style.setProperty('--ui-scale',String(scale)),scale);
+    for(const [orientation,rotationValue] of [['portrait',0],['landscape',1]]){
+      rotate(rotationValue);await waitFor(ui=>{const nav=nativeButtons(ui);return nav.length===4&&new Set(nav.map(n=>bounds(n)[orientation==='portrait'?1:0])).size===1;},'Expected native orientation before the compact layout audit');
+      await select('列表',n=>n.text==='选择日期');
+      const active=page.locator('.screen.active'),strip=active.locator('.date-strip');await strip.scrollIntoViewIfNeeded();await sleep(300);
+      const dates=await strip.evaluate(el=>{
+        const box=node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height};},viewport=box(el),items=[...el.querySelectorAll('.date-item')].map(item=>({...box(item),date:item.dataset.date}));
+        return {viewport,panel:box(el.closest('.date-panel')),itemWidth:items[0].width,visible:items.filter(item=>item.x>=viewport.x-1&&item.right<=viewport.right+1),selected:el.querySelector('[aria-pressed=true]')?.dataset.date,scrollLeft:el.scrollLeft,screenWidth:innerWidth,screenFits:el.closest('.screen').scrollWidth<=el.closest('.screen').clientWidth+1};
+      });
+      assert.ok(dates.screenFits);assert.ok(dates.panel.x>=-1&&dates.panel.right<=dates.screenWidth+1);assert.ok(dates.panel.width<=592*scale+1);
+      assert.ok(dates.itemWidth>=48&&dates.itemWidth<=90*scale+1,'Dates must stay compact while preserving touch targets');assert.ok(dates.visible.length>=(orientation==='portrait'?3:6));assert.ok(dates.selected);
+      await actualSwipe(strip,'left');const movedLeft=await strip.evaluate(el=>el.scrollLeft);assert.ok(movedLeft>dates.scrollLeft+20,'A physical swipe must actually scroll the continuous dates');
+      await actualSwipe(strip,'right');const movedRight=await strip.evaluate(el=>el.scrollLeft);assert.ok(movedRight<movedLeft-20);assert.equal(await strip.locator('[aria-pressed=true]').getAttribute('data-date'),dates.selected,'Scrolling must not select an unrelated day');
+      await strip.evaluate((el,left)=>el.scrollLeft=left,dates.scrollLeft);await sleep(300);dump();capture(`compact-dates-${orientation}`);
+      layoutReport.geometry.push({orientation,dates:{...dates,physicalScroll:{left:movedLeft,right:movedRight}}});record(`${orientation} actual Android date strip stays compact at 110% and supports physical continuous swipes without selecting another day`);
+      await select('设置',n=>n.text==='管理课表，安排提醒，调整你的界面。');await page.locator('.screen.active [data-setting=editor]').click();
+      await page.locator('.screen.active[data-screen=editor]').getByRole('button',{name:'上课时间',exact:true}).click();
+      const times=page.locator('.screen.active[data-screen=times]');await times.waitFor();await page.waitForFunction(()=>{const r=document.querySelector('.screen.active[data-screen=times]')?.getBoundingClientRect();return r&&r.x>=-1&&r.right<=innerWidth+1;});
+      await waitFor(ui=>nativeButtons(ui).length===0,'The time settings subpage must keep native navigation hidden');
+      const rows=await times.locator('.period-editor').evaluateAll(rows=>rows.map(row=>{
+        const box=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height};},label=row.querySelector('span'),range=document.createRange();range.selectNodeContents(label);const text=range.getBoundingClientRect();
+        return {label:{...box(label),text:label.textContent,textBox:{x:text.x,y:text.y,right:text.right,bottom:text.bottom}},card:box(row.closest('.time-list')),inputs:[...row.querySelectorAll('input')].map(input=>({...box(input),type:input.type,value:input.value,scrollWidth:input.scrollWidth,clientWidth:input.clientWidth})),screenWidth:innerWidth};
+      }));
+      assert.equal(rows.length,before.schedule.periods.length);assert.ok(rows.length>=10,'The retained fixture must exercise two-digit period labels');
+      const overlaps=(a,b)=>Math.min(a.right,b.right)-Math.max(a.x,b.x)>.5&&Math.min(a.bottom,b.bottom)-Math.max(a.y,b.y)>.5;
+      for(const [index,row]of rows.entries()){
+        const label=row.label,text=label.textBox;assert.equal(label.text,`第 ${index+1} 节`);assert.equal(row.inputs.length,2);
+        assert.ok(text.x>=label.x-1&&text.right<=label.right+1&&text.y>=label.y-1&&text.bottom<=label.bottom+1,`Period ${index+1} text must fit its label`);
+        for(const [field,input]of row.inputs.entries()){
+          assert.equal(input.type,'time');assert.equal(input.value,before.schedule.periods[index][field?'end':'start']);assert.ok(!overlaps(label,input),`Period ${index+1} label must not intersect a time input`);
+          assert.ok(input.x>=row.card.x-1&&input.right<=row.card.right+1&&input.right<=row.screenWidth+1);assert.ok(input.width<=112*scale+1,'Time inputs must not expand into oversized blocks');assert.ok(input.height>=44);assert.ok(input.scrollWidth<=input.clientWidth+1);
+        }
+        assert.ok(!overlaps(row.inputs[0],row.inputs[1]),`Period ${index+1} time inputs must not overlap`);
+      }
+      assert.ok(await times.evaluate(el=>el.scrollWidth<=el.clientWidth+1));await times.locator('.period-editor').last().scrollIntoViewIfNeeded();dump();capture(`compact-times-${orientation}`);
+      layoutReport.geometry.at(-1).periodRows=rows;record(`${orientation} actual Android period labels, including two digits, fit beside compact nonoverlapping time inputs at 110%`);
+      run('shell','input','keyevent','4');await page.locator('.screen.active[data-screen=editor]').waitFor();await sleep(350);run('shell','input','keyevent','4');await waitFor(ui=>nativeButtons(ui).length===4,'Read-only time settings Back must restore native navigation');
+    }
+    const after=await storedLayoutState();assert.deepEqual(after,before,'Layout checks must preserve saved courses, term, times, books and preferences');layoutReport.retention={beforeSHA256:hash(before),afterSHA256:hash(after),unchanged:true};layoutReport.status='passed';
+  }catch(error){layoutReport.status='failed';layoutReport.error=error.stack;throw error;}
+  finally{
+    await shell.evaluate((el,saved)=>{if(saved.value)el.style.setProperty('--ui-scale',saved.value,saved.priority);else el.style.removeProperty('--ui-scale');},original);
+    layoutReport.cssRestored=await shell.evaluate((el,saved)=>el.style.getPropertyValue('--ui-scale')===saved.value&&el.style.getPropertyPriority('--ui-scale')===saved.priority,original);
+    writeFileSync(path.join(output,`${args['layout-prefix']??`${version}-native-compact-layout`}-results.json`),JSON.stringify(layoutReport,null,2)+'\n');
+  }
+}
 try{
   rotate(0);run('shell','am','force-stop',pkg);run('shell','am','start','-n',`${pkg}/com.dolphin.calendar.MainActivity`);
   if(cdp){
@@ -169,6 +228,7 @@ try{
   tap(ui.find(n=>n.text==='继续编辑'&&n.class==='android.widget.Button'&&visible(n)));ui=await waitFor(ui=>ui.some(n=>n.class==='android.widget.EditText'&&n.text.includes('NativeUnsavedAudit')&&visible(n)),'Continue editing must preserve the draft');
   ui=await editorBack();tap(ui.find(n=>n.text==='放弃修改'&&n.class==='android.widget.Button'&&visible(n)));
   ui=await waitFor(ui=>nativeButtons(ui).length===4&&ui.some(n=>n.text.includes(course)&&!n.text.includes('NativeUnsavedAudit')&&visible(n)),'Discarding must restore navigation and the unchanged saved course');capture('editor-discarded');pass('Continue preserves the draft; discard returns to the native destination and leaves the saved synthetic course unchanged');
+  if(layoutChecks)await compactLayouts();
   report.status='passed';
 }catch(error){firstError=error;report.status='failed';report.error=error.stack;}
 finally{

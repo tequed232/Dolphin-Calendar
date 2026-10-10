@@ -37,6 +37,9 @@ Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $destination 'README.
 $evidenceBase = Join-Path $projectRoot 'build\evidence'
 $evidenceNames = @(
     "$version-responsive-navigation-results.json", "$version-calendar-swipe-results.json",
+    "$version-date-strip-spacing-results.json", "$version-time-settings-layout-results.json", "$version-native-compact-layout-results.json",
+    "$version-date-strip-1304x892-110.png", "$version-date-strip-844x390-135.png", "$version-date-strip-390x844-100.png", "$version-date-strip-320x760-135.png",
+    "$version-time-settings-1304x892-100.png", "$version-time-settings-844x390-135.png", "$version-time-settings-390x844-135.png", "$version-time-settings-320x568-135.png",
     "$version-native-final-results.json", "$version-native-debug-cdp-results.json", "$version-upgrade-results.json",
     "$version-release-identity.json", "$version-build.json", "$version-apk-web-assets.json", "$version-final-rebuild-results.json", "$version-publication.json",
     "$version-navigation-390x844.png", "$version-navigation-320x568.png", "$version-navigation-844x390.png", "$version-navigation-1280x800.png",
@@ -44,6 +47,8 @@ $evidenceNames = @(
     "$version-calendar-year-single-narrow.png", "$version-calendar-year-single-narrow-footer.png", "$version-calendar-year-single-landscape.png",
     "$version-native-final-portrait.png", "$version-native-final-landscape.png", "$version-native-final-calendar.png",
     "$version-native-debug-cdp-portrait.png", "$version-native-debug-cdp-landscape.png",
+    "$version-native-debug-cdp-compact-dates-portrait.png", "$version-native-debug-cdp-compact-dates-landscape.png",
+    "$version-native-debug-cdp-compact-times-portrait.png", "$version-native-debug-cdp-compact-times-landscape.png",
     "$version-native-debug-cdp-calendar-year-swiped.png", "$version-native-debug-cdp-calendar-year-landscape.png",
     "$version-upgrade-before-saved-course.png", "$version-upgrade-after-saved-course.png", "$version-upgrade-before-preferences.png", "$version-upgrade-after-preferences.png",
     "$version-calendar-picker-results.json", "$version-holidays-results.json", "$version-layout-results.json",

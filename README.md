@@ -8,7 +8,7 @@
 
 Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 React 界面提供网页版和 Android 安装版：主页看课程，点击课程看教师、教室和教材，需要时再开启提醒、导航或系统日历。
 
-无需账号，没有自建业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。本文对应 **1.4.6 源码**，各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
+无需账号，没有自建业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。本文对应 **1.4.7 源码**，各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
 
 在线使用：[Dolphin Calendar 网页版](https://tequed232.github.io/Dolphin-Calendar/)。网页版发布运行 `npm run build:pages`，入口为 `build/pages/index.html`。该入口内置编译后的界面代码和样式，图片与离线缓存文件随整个目录发布，支持 `/Dolphin-Calendar/` 子路径。不要将开发用的 `web/index.html` 单独上传。发布工作流和 Pages 发布条件见 [发布说明](docs/PUBLISHING.md)。
 
@@ -21,7 +21,23 @@ Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 Re
 
 *截图为 1.4.5 网页界面的实际验证画面，课程、教师和地点均为演示数据。Android 使用 WebView 外的原生导航，竖屏置底、横屏和宽屏置于侧边。界面支持浅色、深色与跟随系统。*
 
-## 1.4.6 年份控件完善
+## 1.4.7 日期与时间布局完善
+
+宽屏日期条限制在合适宽度，避免日期间隙过大；上课时间为节次标签保留完整空间，两个时间输入更紧凑，并适应手机、横屏及较大字体。应用实现只改对应 CSS，日期选择、时间输入与保存、自动顺延和导入业务继续沿用。
+
+<p align="center">
+  <a href="docs/UI_1.4.7.md"><img src="docs/images/date-strip-wide-1.4.7.png" width="800" alt="1.4.7 宽屏日期条：七张日卡保持紧凑间距，选中日期完整显示" /></a>
+</p>
+<p align="center">
+  <a href="docs/UI_1.4.7.md"><img src="docs/images/time-settings-wide-1.4.7.png" width="550" alt="1.4.7 宽屏上课时间：节次标签完整，两个时间输入保持紧凑" /></a>
+  <a href="docs/UI_1.4.7.md"><img src="docs/images/time-settings-narrow-1.4.7.png" width="230" alt="1.4.7 手机 390×844、135% 缩放：节次标签在上方，开始和结束时间并列且无重叠" /></a>
+</p>
+
+*以上为 1.4.7 本轮实际验证画面，使用合成课表。点击图片查看 [布局与覆盖升级记录](docs/UI_1.4.7.md)。*
+
+发行版本为 **1.4.7 / 10407**，沿用原包名与原发行签名，保留历史版本。完整本地 CI 24/24 组、316 条 PASS，正式／调试 APK 构建及原签名 10406→10407 覆盖升级已通过；完整证据及在线核对方式见 [1.4.7 布局记录](docs/UI_1.4.7.md)。发布入口为 [v1.4.7 Release](https://github.com/tequed232/Dolphin-Calendar/releases/tag/v1.4.7)，发布后按 GitHub 实际状态及交付包发布完成记录核对。
+
+## 1.4.6 历史年份控件完善
 
 月历展开后的年份选择合并为一套控件：可以直接输入年份、点击左右箭头，或在同一区域左右拖动切年；月份选择和月历翻月继续保留。沿用 1.4.5 的实体导航与横竖屏布局，课表业务及数据格式继续保持。
 
@@ -292,6 +308,8 @@ node scripts/check-delivery-integrity.mjs
 npm run check:ui
 node scripts/check-responsive-navigation.mjs
 node scripts/check-calendar-swipe.mjs
+node scripts/check-date-strip-spacing.mjs
+node scripts/check-time-settings-layout.mjs
 node scripts/check-current-time-line.mjs
 node scripts/check-toolbar-import.mjs
 node scripts/check-primary-navigation.mjs
@@ -312,7 +330,7 @@ node scripts/check-offline.mjs
 
 这些流程覆盖首次引导、草稿离开保护、空状态、搜索、导入取消与错误恢复、日期选择、背景、节假日、离线和持久化。结构守卫还会修改关键实现并确认检查能拒绝错误变体。`npm run check` 包含源码准入、历史交付包范围检查、工程及资产检查与两份 TypeScript 测试；单独执行一致性命令便于复核本次同步边界。测试优先使用本机已有 Chrome / Edge，可设置 `CHROME_PATH` 指定浏览器，或设置 `TEST_URL` 指向其他已启动的本地服务。
 
-`node scripts/ci.mjs` 会启动自己的开发服务并顺序运行 22 组浏览器检查，运行前停止已占用 5173 端口的服务。Pages 另执行 `npm run build:pages` 与 `node scripts/check-pages.mjs`，检查项目子路径、旧缓存升级、导入持久化和离线回退。网页默认自动检查版本，离线及 Pages 验证只允许访问本仓库官方 Release API；这项可选请求不传送课表数据。
+`node scripts/ci.mjs` 会启动自己的开发服务并顺序运行 24 组浏览器检查，运行前停止已占用 5173 端口的服务。Pages 另执行 `npm run build:pages` 与 `node scripts/check-pages.mjs`，检查项目子路径、旧缓存升级、导入持久化和离线回退。网页默认自动检查版本，离线及 Pages 验证只允许访问本仓库官方 Release API；这项可选请求不传送课表数据。
 
 导入链路默认使用仓库内的合成旧格式数据，不依赖作者桌面的旧项目。需要额外核对旧版 `schedule.ts` 时，可显式设置 `LEGACY_SCHEDULE_PATH` 后运行 `check-import-ui.mjs`；真实课表样本不进入发布用源码。
 

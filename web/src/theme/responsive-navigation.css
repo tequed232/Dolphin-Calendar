@@ -55,7 +55,8 @@ dialog{scroll-padding-top:76px}
   .home-controls .grid-layout-host{grid-column:1/-1;margin-top:4px;padding-top:4px}
   .greeting{margin-top:14px;margin-bottom:14px}
   .greeting h1{font-size:28px}
-  .date-panel{padding:12px}
+  /* Keep seven date slots compact instead of stretching across the desktop page. */
+  .date-panel{padding:12px;max-width:592px}
   .date-strip .date-item{flex-basis:calc((100% - 36px)/7)}
   .grid-course-content{padding:8px;font-size:13px}
   .grid-course-content strong{font-size:13px}
