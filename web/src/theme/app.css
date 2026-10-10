@@ -76,16 +76,16 @@ button:active{filter:brightness(.94)}
 .period-label small{font-size:9px;position:static;left:-6px;top:12px;writing-mode:horizontal-tb;color:var(--muted);letter-spacing:0;margin-bottom:2px}
 .period-label>span{font-size:10px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
 .period-content{min-width:0;border-left:1px solid var(--line);padding:2px 0 12px 12px}
-.course-card{border-radius:23px;padding:15px 17px 16px;text-align:left;width:100%;display:block;border-left:0;margin-bottom:4px;position:relative;overflow:hidden}
+.course-card{border-radius:23px;padding:15px 17px 16px;text-align:left;width:100%;display:block;border-left:0;margin-bottom:4px;position:relative;overflow:hidden;background:var(--course-surface,var(--surface));color:var(--course-ink,var(--ink))}
 .course-topline{display:flex;align-items:center;justify-content:space-between;font-size:11px;opacity:1;letter-spacing:.3px;color:var(--muted)}
-.course-card h3{font-size:19px;margin:8px 0 14px;overflow-wrap:anywhere}
-.course-meta{display:flex;align-items:center;justify-content:space-between;gap:7px;font-size:12px;opacity:1;flex-wrap:wrap;color:var(--muted)}
+.course-card h3{font-size:19px;margin:8px 0 14px;overflow-wrap:anywhere;color:var(--course-ink,var(--ink))}
+.course-meta{display:flex;align-items:center;justify-content:space-between;gap:7px;font-size:12px;opacity:1;flex-wrap:wrap;color:var(--course-secondary,var(--muted))}
 .course-meta>span{display:flex;gap:3px;align-items:center}
-.sage{background:var(--sage);--course-accent:#91a88c}
-.lavender{background:var(--lavender);--course-accent:#aea1cb}
-.peach{background:var(--peach);--course-accent:#c6a182}
-.blue{background:var(--blue);--course-accent:#8faaba}
-.rose{background:var(--rose);--course-accent:#cba3ad}
+.sage{background:var(--sage);--course-accent:var(--sage-line)}
+.lavender{background:var(--lavender);--course-accent:var(--lavender-line)}
+.peach{background:var(--peach);--course-accent:var(--peach-line)}
+.blue{background:var(--blue);--course-accent:var(--blue-line)}
+.rose{background:var(--rose);--course-accent:var(--rose-line)}
 .free-period{color:var(--line-strong);height:44px;display:flex;align-items:center;padding-left:15px}
 .free-period.continuation{font-size:11px;color:var(--muted)}
 .day-end{text-align:center;font-size:12px;color:var(--muted);margin:25px 0 0}
@@ -385,4 +385,73 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:.8}
  .form-card{padding:16px}
  .setting-entry{padding-left:13px;padding-right:13px;gap:10px}
  .profile-card{padding:16px 14px;gap:11px}
+}
+
+/* Day timetable: semantic section rows remain measurable beneath spanning cards. */
+.list-view .home-date-select.day-heading h1{font-size:28px;letter-spacing:-.5px;line-height:1.2}
+.list-view .home-date-select.day-heading .term-row{margin:5px 0 0;font-size:12px;justify-content:flex-start;gap:7px;font-weight:400}
+.day-course-region{min-width:0}
+.day-introduction{display:flex;align-items:baseline;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin:13px 2px 10px}
+.day-introduction .greeting-line{font-size:12px;line-height:1.6;margin:0;color:var(--muted);overflow-wrap:anywhere}
+.day-term{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+.list-view .home-schedule-heading{margin:20px 2px 12px}
+.day-timetable{display:grid;grid-template-columns:60px minmax(0,1fr);gap:4px 12px;isolation:isolate}
+.day-timetable .period-row{grid-template-columns:60px minmax(0,1fr);gap:12px;min-height:0;position:relative}
+.day-timetable .period-label{padding:12px 0;justify-content:flex-start;gap:2px;border-radius:14px;background:var(--surface);font-variant-numeric:tabular-nums}
+.day-timetable .period-label strong{font-size:17px;line-height:1.3;font-weight:650}
+.day-timetable .period-label>span{font-size:10px;line-height:1.45;margin:0;color:var(--muted)}
+.day-timetable .period-label .period-name{font-size:9px;line-height:1.3;margin:0;overflow-wrap:anywhere;text-align:center}
+.day-timetable .period-content{position:relative;border:0;padding:0;min-height:0;min-width:0}
+.day-timetable .free-period{border-radius:16px;background:color-mix(in srgb,var(--surface) 70%,transparent);border:1px solid color-mix(in srgb,var(--line) 65%,transparent);color:var(--muted);padding:0 16px;opacity:.65;align-items:center}
+.day-break{position:absolute;inset:auto 0 0;display:flex;align-items:center;justify-content:center;gap:8px;font-size:10px;line-height:1.2;color:var(--muted);white-space:nowrap}
+.day-break::before,.day-break::after{content:'';height:1px;flex:1;background:var(--line)}
+.day-break small{font-size:9px;line-height:1.2;font-variant-numeric:tabular-nums}
+.day-timetable .day-course{position:relative;z-index:2;align-self:stretch;justify-self:start;display:flex;flex-direction:column;min-width:0;min-height:0;margin-top:0;margin-right:0;border-radius:var(--course-radius,16px);padding:14px 16px;border:1px solid color-mix(in srgb,var(--course-accent,var(--line)) 40%,transparent);border-left:3px solid var(--course-accent,var(--line));overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--course-accent,var(--line)) transparent;touch-action:pan-y;background:var(--course-surface,var(--surface));color:var(--course-ink,var(--ink))}
+.home-inner.list-view .day-timetable .day-course{background:var(--course-surface,var(--surface));backdrop-filter:none;box-shadow:none}
+.day-course::before{content:none}
+.day-course h3{margin:0 0 12px;font-size:19px;line-height:1.45;overflow-wrap:anywhere;word-break:normal;color:var(--course-ink,var(--ink));flex:none}
+.day-course .course-meta{align-items:flex-start;line-height:1.6;gap:6px 14px;margin-top:auto;flex:none}
+.day-course .course-meta>span{min-width:0;overflow-wrap:anywhere;align-items:flex-start}
+.day-course .course-meta svg{margin-top:3px}
+.day-course[data-lanes]:not([data-lanes='1']){padding:12px}
+.day-course[data-lanes]:not([data-lanes='1']) h3{font-size:17px}
+.day-course[data-lanes]:not([data-lanes='1']) .course-meta{flex-direction:column;gap:4px;font-size:11px}
+.list-view .next-course{margin-top:12px;padding:12px 14px;border-radius:18px;gap:10px}
+.list-view .next-icon{width:34px;height:34px;border-radius:11px}
+.list-view .next-course strong{font-size:15px;line-height:1.5}
+.list-view .next-time{font-size:14px;flex:none}
+@media(orientation:landscape) and (min-width:480px){
+ .list-view .day-content-layout{display:grid;grid-template-columns:100px minmax(0,1fr);gap:12px 18px;align-items:start;padding-top:12px}
+ .list-view .day-date-panel{grid-column:1;grid-row:1 / span 2;position:sticky;top:12px;min-width:0;width:100%;max-width:none;padding:8px;border-radius:20px}
+ .day-date-panel .month-row{justify-content:center;padding:2px 0 8px}
+ .day-date-panel .date-title{padding:0;font-size:11px;white-space:nowrap;text-align:center;line-height:1.4}
+ .vertical-date-strip{flex-direction:column;gap:6px;overflow-x:hidden;overflow-y:auto;touch-action:pan-y;overscroll-behavior-y:contain;height:clamp(84px,calc((var(--native-height,100dvh) - var(--safe-top) - var(--page-bottom)) / var(--ui-scale) - 132px),560px)}
+ .vertical-date-strip .date-item{flex:0 0 68px;width:100%;min-height:68px;padding:7px 4px;gap:2px;border-radius:16px}
+ .vertical-date-strip .date-item>strong{font-size:24px;line-height:1.15}
+ .vertical-date-strip .date-item>span{font-size:11px;line-height:1.3}
+ .day-date-panel .date-panel-hint{display:none}
+ .list-view .day-course-region{grid-column:2;grid-row:1}
+ .list-view .home-content>.day-end{grid-column:2;grid-row:2;margin-top:8px}
+ .day-introduction{margin-top:0}
+ .list-view .home-schedule-heading{margin-top:14px}
+}
+@media(orientation:landscape) and (min-width:480px) and (max-width:699px){
+ .list-view .home-controls{display:block;padding:0}
+ .list-view .home-controls .brand-row{min-height:44px;margin-bottom:4px}
+ .list-view .home-date-select.day-heading{padding:0}
+ .list-view .home-date-select.day-heading h1{font-size:24px;white-space:nowrap}
+ .list-view .home-date-select.day-heading .term-row{margin-top:2px}
+ .list-view .day-content-layout{grid-template-columns:76px minmax(0,1fr);column-gap:12px}
+ .list-view .day-content-layout>.day-date-panel{padding:6px}
+ .list-view .vertical-date-strip{height:clamp(84px,calc((var(--native-height,100dvh) - var(--safe-top) - var(--page-bottom)) / var(--ui-scale) - 140px),560px)}
+ .day-timetable,.day-timetable .period-row{grid-template-columns:48px minmax(0,1fr);column-gap:8px}
+ .day-timetable .day-course{padding:10px}
+ .day-course h3{font-size:16px}
+}
+@media(max-width:350px){
+ .list-view .home-date-select.day-heading h1{font-size:25px}
+ .day-timetable,.day-timetable .period-row{grid-template-columns:48px minmax(0,1fr);column-gap:8px}
+ .day-timetable .day-course{padding:11px}
+ .day-course h3,.day-course[data-lanes]:not([data-lanes='1']) h3{font-size:16px}
+ .day-break small{display:none}
 }

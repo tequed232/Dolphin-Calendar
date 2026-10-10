@@ -5,6 +5,10 @@
 .management-empty p{margin:0;font-size:13px;line-height:1.7}
 .course-management .setting-row small{overflow-wrap:anywhere}
 .course-management-heading h2{flex:1;min-width:0}
+.course-management-heading{gap:12px;margin-block:24px 12px}
+.course-management{border-radius:var(--course-radius)}
+.course-management .setting-row{min-height:64px;padding-block:12px}
+.course-management .setting-row small{font-size:12px;line-height:1.65}
 .course-disclosure{display:flex;align-items:center;gap:12px;text-align:left;min-height:48px;width:100%;border-radius:14px}
 .course-disclosure>span{display:flex;flex-direction:column;gap:4px}
 .course-disclosure small{font-size:12px;font-weight:400;color:var(--muted)}

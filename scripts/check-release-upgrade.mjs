@@ -44,13 +44,14 @@ function packageInfo(){const output=run('shell','dumpsys','package',pkg);const v
 function pass(name){results.push(name);console.log('PASS '+name);}
 async function launch(){run('shell','am','force-stop',pkg);report.lastLaunch=run('shell','am','start','-n',`${pkg}/.MainActivity`);return waitFor(ui=>['列表','平铺','搜索','设置'].every(text=>ui.some(n=>label(n)===text&&n.class==='android.widget.Button'&&n.clickable==='true')));}
 async function retainedFixture(ui,stage){
+  const retainedTerm=n=>n.text===term||(n.text.startsWith(term+' · ')&&/ · (第 \d+ 周|学期外)$/.test(n.text));
   tapText(ui,'列表');
-  ui=await waitFor(nodes=>nodes.some(n=>n.text===term&&n.bounds!=='[0,0][0,0]'));
-  assert.ok(ui.some(n=>n.text===term),'Seeded term missing');capture(`${stage}-list`);
+  ui=await waitFor(nodes=>nodes.some(n=>retainedTerm(n)&&n.bounds!=='[0,0][0,0]'));
+  assert.ok(ui.some(retainedTerm),'Seeded term missing');capture(`${stage}-list`);
   // Search reads the whole saved timetable, so validation does not depend on today's weekday.
   tapText(ui,'搜索');ui=await waitFor(nodes=>nodes.some(n=>n.text.includes(course)&&n.bounds!=='[0,0][0,0]'));
   assert.ok(ui.some(n=>n.text.includes(course)&&n.bounds!=='[0,0][0,0]'),'Seeded course missing');capture(`${stage}-saved-course`);
-  tapText(ui,'列表');return waitFor(nodes=>nodes.some(n=>n.text===term));
+  tapText(ui,'列表');return waitFor(nodes=>nodes.some(retainedTerm));
 }
 async function capturePreferences(ui,stage){
   tapText(ui,'设置');ui=await waitFor(nodes=>nodes.some(n=>n.text.startsWith('外观 ')&&n.class==='android.widget.Button'));

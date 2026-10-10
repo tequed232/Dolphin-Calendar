@@ -158,7 +158,7 @@ async function verifyHome(name, periods) {
   assert.equal(await active().locator('.period-row').count(), periods.length);
   const card = active().locator('.course-card').filter({has: page.locator('h3', {hasText: name})});
   await card.waitFor();
-  assert.match(await card.innerText(), new RegExp(periods[4].start + ' – ' + periods[5].end));
+  assert.match(await card.getAttribute('aria-label'), new RegExp(periods[4].start + String.raw`\s*–\s*` + periods[5].end));
   await card.click();
   const sheet = page.getByRole('dialog', {name: `${name}详情`, exact: true});
   assert.match(await sheet.locator('.teacher').innerText(), new RegExp(periods[4].start + '–' + periods[5].end));

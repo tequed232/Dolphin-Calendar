@@ -6,19 +6,9 @@ import {gridRows,weekOccurrences,closestSection} from '../lib/gridLayout';
 import {coursesConflict,periodRest} from '../lib/scheduleTime';
 import {Dialog} from './Dialog';
 import {CurrentTimeLine} from './CurrentTimeLine';
+import {layoutCourses} from './timetablePresentation';
 const THRESHOLD=8,HOLD=500;
 type Gesture={course:Course;date:string;edge:'start'|'end'|'move';x:number;y:number;rowStarts:number[];rowEnds:number[];columnStep:number;pointerId:number;next:Course;moved:boolean};
-type PositionedCourse={course:Course;lane:number;lanes:number};
-function layoutCourses(courses:Course[]){
- const positioned:PositionedCourse[]=[],group:PositionedCourse[]=[],ends:number[]=[];let groupEnd=0;
- function finishGroup(){for(const item of group)item.lanes=ends.length;positioned.push(...group);group.length=0;ends.length=0;}
- for(const course of [...courses].sort((a,b)=>a.start-b.start||a.end-b.end)){
-  if(group.length&&course.start>groupEnd)finishGroup();
-  const available=ends.findIndex(end=>end<course.start),lane=available<0?ends.length:available;
-  ends[lane]=course.end;groupEnd=Math.max(groupEnd,course.end);group.push({course,lane,lanes:1});
- }
- finishGroup();return positioned;
-}
 export function TimetableGrid({now,showTimeLine,statusHost,selected,interactive,create,view,focusCourse,selectDate,onEditingChange}:{now:number;showTimeLine:boolean;statusHost:HTMLElement|null;selected:string;interactive:boolean;create:(seed:Partial<Course>)=>void;view:(course:Course,date:string)=>void;focusCourse:(course:Course,date:string)=>void;selectDate:(date:string)=>void;onEditingChange:(editing:boolean)=>void}){
  const {data,update,toast}=useApp(),{schedule,settings}=data;
  const [selectedCourseId,setSelectedCourseId]=useState<string|null>(null),[gesture,setGesture]=useState<Gesture|null>(null),[pending,setPending]=useState<Course|null>(null),[conflicts,setConflicts]=useState<Course[]>([]),[saving,setSaving]=useState(false);

@@ -2,7 +2,7 @@ import {readFileSync,existsSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 // SHA-256 baseline from the supplied 2026-10-08 delivery source.
-// Historical hashes remain unchanged. 1.4.5 allows only the explicit reviewed UI paths below.
+// Historical hashes remain unchanged. Explicit UI paths include the authorized 1.4.8 refinement.
 const expected={
   "app/src/main/AndroidManifest.xml": "d09e1b0bfadd1039b2d2ce6f3bcd687414447fc4fe5ef1eefa11354bebd747d3",
   "app/src/main/java/com/dolphin/calendar/AppUpdates.kt": "29cf6c529480d16c9b61d0172db5d9c8ce3170f66cfd72bbf2c83fc872025558",
@@ -131,6 +131,11 @@ const expected={
 // Scope allowance, not a new hash baseline. Unlisted business files remain frozen.
 // Mixed UI/bridge files require review plus behavior checks.
 const reviewedUI={
+ "web/src/components/InfiniteDateStrip.tsx":"1.4.8 horizontal/vertical presentation of the same continuous date window",
+ "web/src/components/TimetableGrid.tsx":"1.4.8 shared pure overlap presentation without changing edit or save behavior",
+ "web/src/theme/tokens.css":"1.4.8 shared light/dark/system course surface and text tokens",
+ "web/src/theme/page-structure.css":"1.4.8 scoped spacing within the existing viewport",
+ "web/src/theme/editor-experience.css":"1.4.8 scoped course detail/editor visual spacing",
  "app/src/main/java/com/dolphin/calendar/MainActivity.kt":"Native navigation host and viewport bridge",
  "web/src/App.tsx":"Primary navigation and overlay visibility",
  "web/src/components/CalendarPicker.tsx":"Continuous month/year navigation",

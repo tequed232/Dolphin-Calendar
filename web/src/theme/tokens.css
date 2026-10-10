@@ -7,17 +7,19 @@
   --ink: #182c2d;
   --muted: #657477;
   --accent: #007f89;
+  --brand-accent: #007f89;
   --on-accent: #ffffff;
   --accent-soft: #e3f2f2;
   --soft: #edf1f2;
   --line: #e4e9eb;
   --line-strong: #b2bec2;
   --danger: #bd3a39;
-  --sage: #e8f1e6;
-  --lavender: #eeeafb;
-  --peach: #fcf0df;
-  --blue: #e5f0fa;
-  --rose: #f9e9ed;
+  --sage: #e7eee7; --sage-ink: #35533e; --sage-line: #719379;
+  --lavender: #eeebf2; --lavender-ink: #5c4e70; --lavender-line: #9687ad;
+  --peach: #f3ece4; --peach-ink: #6d503a; --peach-line: #b38e6d;
+  --blue: #e8eef3; --blue-ink: #405e75; --blue-line: #7f9fb8;
+  --rose: #f3e9ed; --rose-ink: #784b5c; --rose-line: #b98a9c;
+  --course-radius: 16px;
   --desktop: #e8edef;
   --page-gutter: 20px;
   --safe-top: 0px;
@@ -38,28 +40,43 @@
   --ui-scale: 1;
   --back-progress: 0;
 }
-:root[data-dynamic=true] { --accent: var(--system-primary,#007f89) }
 :root[data-mode=dark] {
   color-scheme: dark;
-  --canvas: #101719; --surface: #1d272a; --input: #283336;
-  --ink: #f0f5f5; --muted: #a2b2b7; --accent: #79d7da;
-  --on-accent: #073338; --accent-soft: #233e42; --soft: #293538;
-  --line: #334247; --line-strong: #657b82; --danger: #ffa6a3;
-  --sage: #2a4035; --lavender: #36324e; --peach: #453c2b;
-  --blue: #263c4e; --rose: #49323b; --desktop: #080e10;
+  --canvas: #121416; --surface: #202326; --input: #292d31;
+  --ink: #eef0f1; --muted: #a8afb5; --accent: #79d7da; --brand-accent: #79d7da;
+  --on-accent: #073338; --accent-soft: #233e42; --soft: #2b3034;
+  --line: #343a40; --line-strong: #69727a; --danger: #ffa6a3;
+  --sage: #26342d; --sage-ink: #c2d8c7; --sage-line: #8caf96;
+  --lavender: #302d39; --lavender-ink: #d5cfe1; --lavender-line: #ada2c4;
+  --peach: #38312b; --peach-ink: #e2d0bf; --peach-line: #c4a58a;
+  --blue: #29343d; --blue-ink: #c7d8e4; --blue-line: #92afc4;
+  --rose: #392e34; --rose-ink: #e0cbd3; --rose-line: #c49aa8;
+  --desktop: #090b0d;
   --glass-tint: #172a30b0; --glass-border: #ffffff38;
   --glass-drop-tint: #97e6ed1f; --glass-rim: #d9ffff75;
 }
 @media(prefers-color-scheme:dark) {
   :root[data-mode=system] {
     color-scheme: dark;
-    --canvas: #101719; --surface: #1d272a; --input: #283336;
-    --ink: #f0f5f5; --muted: #a2b2b7; --accent: #79d7da;
-    --on-accent: #073338; --accent-soft: #233e42; --soft: #293538;
-    --line: #334247; --line-strong: #657b82; --danger: #ffa6a3;
-    --sage: #2a4035; --lavender: #36324e; --peach: #453c2b;
-    --blue: #263c4e; --rose: #49323b; --desktop: #080e10;
+    --canvas: #121416; --surface: #202326; --input: #292d31;
+    --ink: #eef0f1; --muted: #a8afb5; --accent: #79d7da; --brand-accent: #79d7da;
+    --on-accent: #073338; --accent-soft: #233e42; --soft: #2b3034;
+    --line: #343a40; --line-strong: #69727a; --danger: #ffa6a3;
+    --sage: #26342d; --sage-ink: #c2d8c7; --sage-line: #8caf96;
+    --lavender: #302d39; --lavender-ink: #d5cfe1; --lavender-line: #ada2c4;
+    --peach: #38312b; --peach-ink: #e2d0bf; --peach-line: #c4a58a;
+    --blue: #29343d; --blue-ink: #c7d8e4; --blue-line: #92afc4;
+    --rose: #392e34; --rose-ink: #e0cbd3; --rose-line: #c49aa8;
+    --desktop: #090b0d;
     --glass-tint: #172a30b0; --glass-border: #ffffff38;
     --glass-drop-tint: #97e6ed1f; --glass-rim: #d9ffff75;
   }
 }
+/* Course identity has the same semantic colors in list, grid, and detail. */
+:root .sage { --course-surface: var(--sage); --course-ink: var(--sage-ink); --course-accent: var(--sage-line) }
+:root .lavender { --course-surface: var(--lavender); --course-ink: var(--lavender-ink); --course-accent: var(--lavender-line) }
+:root .peach { --course-surface: var(--peach); --course-ink: var(--peach-ink); --course-accent: var(--peach-line) }
+:root .blue { --course-surface: var(--blue); --course-ink: var(--blue-ink); --course-accent: var(--blue-line) }
+:root .rose { --course-surface: var(--rose); --course-ink: var(--rose-ink); --course-accent: var(--rose-line) }
+:root :is(.sage,.lavender,.peach,.blue,.rose) { --course-secondary: color-mix(in srgb,var(--course-ink) 90%,var(--course-surface)) }
+:root[data-dynamic=true] { --accent: var(--system-primary,var(--brand-accent)) }

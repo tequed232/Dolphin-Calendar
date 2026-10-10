@@ -23,9 +23,10 @@ async function seed(courses,patch={}){
 }
 async function select(date){await page.evaluate(value=>window.dispatchEvent(new CustomEvent('dolphin-date',{detail:value})),date);await page.waitForFunction(value=>document.querySelector('.term-row [role=status]')?.getAttribute('aria-label')?.startsWith(value),date);}
 async function revealAction(locator){
-  const box=await locator.boundingBox(),dock=await page.locator('.primary-navigation').boundingBox();
-  if(box.y+box.height>dock.y-12)await active().evaluate((el,distance)=>el.scrollBy({top:distance,behavior:'instant'}),box.y+box.height-dock.y+12);
-  const visible=await locator.boundingBox();assert.ok(visible.y>=0&&visible.y+visible.height<=dock.y-11,'操作按钮应能完整滚到 Dock 上方');
+  // Empty dates now retain the full section axis; a retained reading position can
+  // put the guidance above the viewport as well as below it.
+  await locator.scrollIntoViewIfNeeded();const host=await active().boundingBox(),nav=await page.locator('.primary-navigation').boundingBox(),visible=await locator.boundingBox(),bottom=Math.min(host.y+host.height,nav.width>nav.height?nav.y:host.y+host.height);
+  assert.ok(visible.y>=host.y-1&&visible.y+visible.height<=bottom+1,'操作按钮应完整处于独立导航之外的页面可见区：'+JSON.stringify({visible,host,nav}));
 }
 function course(id,name,day,start,end,weeks,teacher='陈老师',room='16栋203号教室'){return {id,name,day,start,end,weeks,teacher,room,color:'sage',notes:''};}
 await mkdir('build/evidence',{recursive:true});
@@ -164,13 +165,13 @@ try{
   pass('330×640、110% 比例、深色与减少动态效果下，输入、清除、空状态操作均无横向溢出');
   await seed(courses,{showTimes:false});await select('2026-10-07');
   assert.equal(await page.locator('.period-label > span').count(),0);
-  assert.equal(await page.locator('.timetable .course-topline > span').count(),1);
+  assert.match(await page.locator('.timetable .day-course').getAttribute('aria-label'),/3–4 节/);assert.doesNotMatch(await page.locator('.timetable .day-course').getAttribute('aria-label'),/\d{2}:\d{2}/);assert.equal(await page.locator('.timetable .course-topline').count(),0);
   assert.doesNotMatch(await page.locator('.next-time').innerText(),/\d{2}:\d{2}/);
   await page.reload();await select('2026-10-07');
   assert.equal(await page.locator('.period-label > span').count(),0);
   await seed(courses,{showTimes:true});await select('2026-10-07');
   assert.ok(await page.locator('.period-label > span').count()>0);
-  assert.equal(await page.locator('.timetable .course-topline > span').count(),2);
+  assert.match(await page.locator('.timetable .day-course').getAttribute('aria-label'),/3–4 节，10:00–11:40/);assert.equal(await page.locator('.timetable .course-topline').count(),0);
   assert.match(await page.locator('.next-time').innerText(),/\d{2}:\d{2}/);
   pass('列表时间显示与偏好一致，隐藏后刷新仍生效，重新开启恢复课程时间');
   const dated={...course('dated','临时讲座',3,1,2,[1]),temporary:true,specificDate:'2026-10-07'};

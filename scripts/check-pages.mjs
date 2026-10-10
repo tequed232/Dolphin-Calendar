@@ -36,8 +36,9 @@ try{
   await page.getByRole('button',{name:'先逛一逛',exact:true}).click();
   assert.equal(await page.locator('.today-fab').count(),0);
   const today=page.locator('.week-controls').getByRole('button',{name:'回到今天',exact:true});
-  await page.getByRole('button',{name:'下一周',exact:true}).click();assert.notEqual(await page.locator('.greeting h1').innerText(),'今天');
-  await today.click();assert.equal(await page.locator('.greeting h1').innerText(),'今天');
+  const homeDate=()=>page.locator('.screen.active .home-inner').getAttribute('data-focus-date'),homeTitle=()=>page.locator('.screen.active .day-heading h1').innerText(),currentDate=await homeDate(),currentTitle=await homeTitle();
+  await page.getByRole('button',{name:'下一周',exact:true}).click();assert.notEqual(await homeDate(),currentDate);assert.notEqual(await homeTitle(),currentTitle);
+  await today.click();assert.equal(await homeDate(),currentDate);assert.equal(await homeTitle(),currentTitle);
   await page.setViewportSize({width:320,height:800});
   assert.equal(await page.locator('.month-row').evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
   await page.setViewportSize({width:390,height:844});

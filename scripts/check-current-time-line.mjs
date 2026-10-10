@@ -3,7 +3,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {launchBrowser} from './check-browser.mjs';
 import {goTab} from './check-navigation.mjs';
 
-const browser=await launchBrowser(),page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'Asia/Singapore',hasTouch:true}),checks=[],errors=[];
+const browser=await launchBrowser(),page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'Asia/Singapore',hasTouch:true}),checks=[],errors=[],hitTargets=[];
 page.on('pageerror',error=>errors.push(error.message));
 await page.addInitScript(()=>{window.commands=[];window.Dolphin={postMessage(raw){window.commands.push(JSON.parse(raw));}};});
 await page.route('https://api.github.com/repos/tequed232/Dolphin-Calendar/releases/latest',route=>route.fulfill({json:{tag_name:'v1.4.3',html_url:'https://github.com/tequed232/Dolphin-Calendar/releases/tag/v1.4.3'}}));
@@ -29,6 +29,18 @@ async function expected(section,phase,progress,next=section+1){
  assert.equal(await line().getAttribute('data-time-section'),String(section));assert.equal(await line().getAttribute('data-time-phase'),phase);assert.ok(Math.abs(value.actual-value.expected)<1,JSON.stringify(value));
 }
 async function viewLine(){await line().evaluate(el=>{const screen=el.closest('.screen'),r=el.getBoundingClientRect();screen.scrollTop+=r.top-400;});await page.waitForTimeout(250);}
+async function timeLineCoursePoint(id){
+ const result=await active().evaluate((screen,id)=>{
+  const card=screen.querySelector('[data-course-id="'+id+'"]'),line=screen.querySelector('.current-time-line'),content=card?.querySelector('.grid-course-content');if(!card||!line||!content)return null;
+  const c=content.getBoundingClientRect(),l=line.getBoundingClientRect(),host=screen.getBoundingClientRect(),y=l.top+l.height/2,center={x:c.left+c.width/2,y},centerHit=document.elementFromPoint(center.x,center.y),left=Math.max(c.left+2,host.left+2),right=Math.min(c.right-2,host.right-2);
+  // Test the course body at the real time-line intersection. The separate
+  // Adjust button is a valid editing target, not a detail-opening target.
+  if(y<c.top||y>c.bottom||y<host.top||y>host.bottom)return {point:null,course:c.toJSON(),line:l.toJSON()};
+  for(let x=left;x<=right;x+=2){const hit=document.elementFromPoint(x,y);if(hit?.closest('.grid-course-content')===content)return {point:{x,y},centerHit:centerHit?.className,hit:hit.className,course:c.toJSON(),line:l.toJSON()};}
+  return {point:null,centerHit:centerHit?.className,course:c.toJSON(),line:l.toJSON()};
+ },id);
+ assert.ok(result?.point,'当前时间线与可见课程主体应存在真实可点击交集：'+JSON.stringify(result));hitTargets.push(result);return result.point;
+}
 async function importFile(path){await goTab(page,'平铺');await showToolbar();await active().getByRole('button',{name:'导入课表',exact:true}).click();await active().getByLabel('选择课表文件',{exact:true}).setInputFiles(path);const preview=page.getByRole('dialog',{name:'确认这份课表',exact:true});await preview.waitFor();await preview.getByRole('button',{name:'确认导入',exact:true}).click();await active().locator('.week-grid').waitFor();}
 try{
  await mkdir('build/evidence',{recursive:true});await page.clock.install({time:new Date('2026-10-07T06:45:00Z')});await page.clock.setFixedTime(new Date('2026-10-07T06:45:00Z'));
@@ -53,10 +65,10 @@ try{
   await goTab(page,'设置');await active().locator('[data-setting=home-settings]').click();await toggle('show-times',false);await goTab(page,'平铺');assert.equal(await active().locator('.grid-period-time small').count(),0);await expected(6,'lesson',20/45);await goTab(page,'设置');await active().locator('[data-setting=home-settings]').click();await toggle('show-times',true);await goTab(page,'平铺');
  });
  await check('时间线不拦截课程点击、长按和Resize；编辑仍能完成退出',async()=>{
-  await viewLine();const card=active().locator('[data-course-id=wed]');let box=await card.boundingBox(),l=await line().boundingBox();await page.mouse.click(box.x+box.width/2,l.y+l.height/2);await page.getByRole('button',{name:'关闭课程详情',exact:true}).click();await page.locator('.course-sheet').waitFor({state:'hidden'});assert.equal(await page.locator('.resize-handle').count(),0);
+  await viewLine();const clickPoint=await timeLineCoursePoint('wed');await page.mouse.click(clickPoint.x,clickPoint.y);await page.getByRole('button',{name:'关闭课程详情',exact:true}).click();await page.locator('.course-sheet').waitFor({state:'hidden'});assert.equal(await page.locator('.resize-handle').count(),0);
   // Details can restore scroll and animate the toolbar. Re-measure the visible
   // intersection instead of pressing coordinates captured before it opened.
-  await viewLine();box=await card.boundingBox();l=await line().boundingBox();const point={x:box.x+box.width/2,y:l.y+l.height/2};assert.equal(await page.evaluate(({x,y})=>document.elementFromPoint(x,y)?.closest('[data-course-id]')?.getAttribute('data-course-id'),point),'wed');
+  await viewLine();const point=await timeLineCoursePoint('wed');assert.equal(await page.evaluate(({x,y})=>document.elementFromPoint(x,y)?.closest('[data-course-id]')?.getAttribute('data-course-id'),point),'wed');
   await page.mouse.move(point.x,point.y);await page.mouse.down();await page.clock.runFor(550);await active().locator('.week-grid[data-layout-editing=true]').waitFor();assert.equal(await page.locator('.resize-handle').count(),2);await page.mouse.up();assert.equal(await page.locator('.resize-handle').count(),2);await page.getByRole('button',{name:'周三数学结束节次拖动',exact:true}).press('ArrowDown');await page.waitForTimeout(150);assert.equal((await stored()).schedule.courses.find(c=>c.id==='wed').end,7);await showToolbar();await active().getByRole('button',{name:'完成',exact:true}).click();assert.equal(await page.locator('.resize-handle').count(),0);
  });
  await check('定时更新时间线不重新定位、不读取课表、不保存课表或重发原生同步',async()=>{
@@ -73,5 +85,5 @@ try{
  await check('午夜后尊重选中的旧日期，新一天当前时间只在本周平铺显示',async()=>{
   await goTab(page,'列表');await clock('2026-10-08T00:05:00Z');assert.equal(await active().locator('.home-inner').getAttribute('data-focus-date'),'2026-10-07');assert.equal(await line().count(),0);await goTab(page,'平铺');await expected(1,'lesson',1/3);
  });
- assert.deepEqual(errors,[]);await writeFile('build/evidence/current-time-line-results.json',JSON.stringify({at:new Date().toISOString(),checks,errors},null,2));
+ assert.deepEqual(errors,[]);await writeFile('build/evidence/current-time-line-results.json',JSON.stringify({at:new Date().toISOString(),checks,errors,hitTargets},null,2));
 }finally{await browser.close();}

@@ -8,20 +8,29 @@
 
 Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 React 界面提供网页版和 Android 安装版：主页看课程，点击课程看教师、教室和教材，需要时再开启提醒、导航或系统日历。
 
-无需账号，没有自建业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。本文对应 **1.4.7 源码**，各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
+无需账号，没有自建业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。本文对应 **1.4.8 源码**，各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
 
 在线使用：[Dolphin Calendar 网页版](https://tequed232.github.io/Dolphin-Calendar/)。网页版发布运行 `npm run build:pages`，入口为 `build/pages/index.html`。该入口内置编译后的界面代码和样式，图片与离线缓存文件随整个目录发布，支持 `/Dolphin-Calendar/` 子路径。不要将开发用的 `web/index.html` 单独上传。发布工作流和 Pages 发布条件见 [发布说明](docs/PUBLISHING.md)。
 
 [功能](#功能概览) · [JSON 格式](#json-课表格式) · [本地开发](#本地开发) · [架构](#工程架构) · [验证](#验证与测试) · [许可](#许可证与美术资产)
 
+## 1.4.8 日课表与横屏界面精修
+
+日课表使用独立时间轴与连续课程单卡，重叠课程按时段分列；日期只显示一次，星期和课程数为次级信息。横屏将导航、竖向日期栏和课程区依次排列，手机保留横向日期条。课程色彩、长内容阅读与平铺编辑反馈同步整理，原有详情、保存、导入与数据格式继续使用。
+
 <p align="center">
-  <img src="docs/images/navigation-portrait-1.4.5.png" width="260" alt="1.4.5 竖屏：课表工具栏与星期分开占位，四项实体底部导航" />
-  <img src="docs/images/navigation-landscape-1.4.5.png" width="540" alt="1.4.5 横屏：左侧四项导航，课表使用完整可用宽度" />
+  <a href="docs/UI_1.4.8.md"><img src="docs/images/day-portrait-1.4.8.png" width="260" alt="1.4.8 手机日课表：实际日期只显示一次，编号与开始结束时间独立占位，连续课程是一张跨节卡片" /></a>
+  <a href="docs/UI_1.4.8.md"><img src="docs/images/day-landscape-1.4.8.png" width="720" alt="1.4.8 横屏日课表：最左导航、中间竖向日期栏、右侧时间轴与跨节课程区平行排列" /></a>
+</p>
+<p align="center">
+  <a href="docs/UI_1.4.8.md"><img src="docs/images/grid-dark-1.4.8.png" width="800" alt="1.4.8 深色平铺：低饱和课程表面和浅色文字，连续课程跨节显示，原课程编辑入口保留" /></a>
 </p>
 
-*截图为 1.4.5 网页界面的实际验证画面，课程、教师和地点均为演示数据。Android 使用 WebView 外的原生导航，竖屏置底、横屏和宽屏置于侧边。界面支持浅色、深色与跟随系统。*
+*以上为 1.4.8 当前源码的实际验证画面，课程、教师和地点均为合成演示数据。Android 使用 WebView 外的原生导航，竖屏置底、横屏及宽屏置于侧边；网页按相同方向独立占位。点击图片查看 [界面与升级记录](docs/UI_1.4.8.md)。*
 
-## 1.4.7 日期与时间布局完善
+发行版本为 **1.4.8 / 10408**，沿用原包名与原发行签名。完整本地 CI **27/27 组、378 条 PASS**，最终正式／调试 APK 构建、原签名覆盖升级 11 项和正式原生导航 11 项及 Debug WebView 22 项已通过。范围、配置、最终包哈希及验收见 [1.4.8 界面记录](docs/UI_1.4.8.md)。本版入口为 [v1.4.8 Release](https://github.com/tequed232/Dolphin-Calendar/releases/tag/v1.4.8)，线上发布按 GitHub 实际状态及交付包发布完成记录核对。历史 1.4.7 保留在下文。
+
+## 1.4.7 历史日期与时间布局完善
 
 宽屏日期条限制在合适宽度，避免日期间隙过大；上课时间为节次标签保留完整空间，两个时间输入更紧凑，并适应手机、横屏及较大字体。应用实现只改对应 CSS，日期选择、时间输入与保存、自动顺延和导入业务继续沿用。
 
@@ -309,6 +318,9 @@ npm run check:ui
 node scripts/check-responsive-navigation.mjs
 node scripts/check-calendar-swipe.mjs
 node scripts/check-date-strip-spacing.mjs
+node scripts/check-date-rail.mjs
+node scripts/check-day-timetable-layout.mjs
+node scripts/check-course-theme.mjs
 node scripts/check-time-settings-layout.mjs
 node scripts/check-current-time-line.mjs
 node scripts/check-toolbar-import.mjs

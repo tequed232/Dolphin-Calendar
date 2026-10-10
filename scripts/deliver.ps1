@@ -36,11 +36,19 @@ Copy-Item -LiteralPath "docs\UI_$version.md" -Destination (Join-Path $destinatio
 Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $destination 'README.md') -Force
 $evidenceBase = Join-Path $projectRoot 'build\evidence'
 $evidenceNames = @(
+    "$version-day-timetable-layout-results.json", "$version-date-rail-results.json", "$version-course-theme-results.json",
+    "$version-day-timetable-1304x892.png", "$version-day-timetable-844x390.png", "$version-day-timetable-390x844.png", "$version-day-timetable-320x568.png",
+    "$version-day-normal-portrait.png", "$version-day-normal-landscape.png", "$version-day-normal-grid.png", "$version-day-normal-rail-reading.png",
+    "$version-date-rail-1304x892-100.png", "$version-date-rail-1304x892-135.png", "$version-date-rail-844x390-100.png", "$version-date-rail-844x390-135.png", "$version-date-rail-568x320-135.png",
+    "$version-course-theme-light-portrait-list.png", "$version-course-theme-dark-portrait-list.png", "$version-course-theme-dark-portrait-grid.png",
+    "$version-course-theme-dark-landscape-135-list.png", "$version-course-theme-dark-landscape-135-grid.png", "$version-course-theme-dark-landscape-135-grid-selected.png", "$version-course-theme-dark-landscape-135-grid-drag.png",
+    "$version-course-theme-dark-portrait-detail-top.png", "$version-course-theme-dark-portrait-detail.png", "$version-course-theme-dark-landscape-135-detail.png",
     "$version-responsive-navigation-results.json", "$version-calendar-swipe-results.json",
     "$version-date-strip-spacing-results.json", "$version-time-settings-layout-results.json", "$version-native-compact-layout-results.json",
     "$version-date-strip-1304x892-110.png", "$version-date-strip-844x390-135.png", "$version-date-strip-390x844-100.png", "$version-date-strip-320x760-135.png",
     "$version-time-settings-1304x892-100.png", "$version-time-settings-844x390-135.png", "$version-time-settings-390x844-135.png", "$version-time-settings-320x568-135.png",
     "$version-native-final-results.json", "$version-native-debug-cdp-results.json", "$version-upgrade-results.json",
+    "$version-upgrade-visual-review.json", "$version-native-course-theme-results.json",
     "$version-release-identity.json", "$version-build.json", "$version-apk-web-assets.json", "$version-final-rebuild-results.json", "$version-publication.json",
     "$version-navigation-390x844.png", "$version-navigation-320x568.png", "$version-navigation-844x390.png", "$version-navigation-1280x800.png",
     "$version-calendar-swipe-portrait.png", "$version-calendar-swipe-landscape.png", "$version-calendar-year-swipe.png",
@@ -49,6 +57,7 @@ $evidenceNames = @(
     "$version-native-debug-cdp-portrait.png", "$version-native-debug-cdp-landscape.png",
     "$version-native-debug-cdp-compact-dates-portrait.png", "$version-native-debug-cdp-compact-dates-landscape.png",
     "$version-native-debug-cdp-compact-times-portrait.png", "$version-native-debug-cdp-compact-times-landscape.png",
+    "$version-native-debug-cdp-retained-course-portrait.png", "$version-native-debug-cdp-retained-course-landscape.png",
     "$version-native-debug-cdp-calendar-year-swiped.png", "$version-native-debug-cdp-calendar-year-landscape.png",
     "$version-upgrade-before-saved-course.png", "$version-upgrade-after-saved-course.png", "$version-upgrade-before-preferences.png", "$version-upgrade-after-preferences.png",
     "$version-calendar-picker-results.json", "$version-holidays-results.json", "$version-layout-results.json",

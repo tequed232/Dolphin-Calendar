@@ -18,5 +18,25 @@
 .course-sheet .book-heading{align-items:flex-start}
 .course-sheet .book-heading>span{text-align:right;line-height:1.6}
 .course-sheet .sheet-body:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+.course-sheet .sheet-title{padding-block:10px;gap:12px}
+.course-sheet .course-tag{background:var(--course-surface);color:var(--course-ink);border-radius:var(--course-radius);padding:7px 12px;line-height:1.5}
+.course-sheet .sheet-body>h1{font-size:clamp(22px,5vw,28px);line-height:1.3;letter-spacing:-.4px;margin:12px 0 8px}
+.course-sheet .teacher{font-size:13px;line-height:1.7;margin-bottom:20px}
+.course-sheet .detail-row{margin-top:20px;gap:12px}
+.course-sheet .detail-row>div{gap:4px}
+.course-sheet .detail-row strong{font-size:15px;line-height:1.65}
+.course-sheet .date-chips{gap:7px;margin:12px 0 16px 32px}
+.course-sheet .book-heading{gap:8px 14px;margin:24px 0 14px;padding-top:20px}
+.course-sheet .book-heading h2{font-size:17px;line-height:1.5;flex:1 1 140px}
+.course-sheet .book-heading>span{font-size:11px;max-width:100%;text-align:left;overflow-wrap:anywhere}
+.course-sheet .sheet-body>p.muted{font-size:13px;line-height:1.75;margin-bottom:16px}
+.course-sheet .sheet-body>.secondary.full{margin-top:16px}
+.course-sheet .hint{font-size:12px;line-height:1.7;margin:10px 0 20px}
+.course-sheet :is(.primary,.secondary,.book-card,.notes),.book-editor-form :is(.primary,.secondary){border-radius:var(--course-radius)}
+.course-sheet .book-actions{gap:10px;margin-top:12px}
+.course-sheet .book-actions>.secondary{font-size:13px;min-height:48px;padding:12px;line-height:1.6}
+.course-sheet .book-card{padding:16px;gap:12px}
+.course-sheet .notes{font-size:13px;line-height:1.75;padding:16px;margin-block:20px 12px}
+.course-sheet .sheet-body>.text-button{min-height:44px;margin-top:8px}
 [data-keyboard='true'] .book-editor-form .book-edit-top{display:none}
 @media(max-width:340px){.editor-actions .button-row{gap:7px}.editor-actions .button-row>*{padding:11px 13px}.book-edit-top{gap:12px}}

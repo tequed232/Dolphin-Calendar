@@ -7,11 +7,12 @@ import path from 'node:path';
 import {_android} from 'playwright';
 
 const args=Object.fromEntries(process.argv.slice(2).reduce((pairs,item,index,all)=>{if(item.startsWith('--'))pairs.push([item.slice(2),all[index+1]?.startsWith('--')?true:all[index+1]??true]);return pairs;},[]));
-const serial=args.serial??'emulator-5562',pkg=args.package??'com.dolphin.calendar',cdp=Boolean(args.cdp),layoutChecks=Boolean(args['layout-checks']);
+const serial=args.serial??'emulator-5562',pkg=args.package??'com.dolphin.calendar',cdp=Boolean(args.cdp),layoutChecks=Boolean(args['layout-checks']),themeChecks=Boolean(args['theme-checks']);
 assert.match(serial,/^emulator-\d+$/,'Only the task emulator can be used');
 assert.ok(['com.dolphin.calendar','com.dolphin.calendar.debug'].includes(pkg));
 assert.ok(!cdp||pkg.endsWith('.debug'),'CDP is only available on the isolated debug package');
 assert.ok(!layoutChecks||cdp,'Compact layout checks require the isolated debug WebView');
+assert.ok(!themeChecks||cdp,'Course theme checks require the isolated debug WebView');
 assert.ok(!args.seed||(cdp&&pkg.endsWith('.debug')),'Seeding is limited to a fresh isolated debug package');
 const adbPath=args.adb??path.join(process.env.ANDROID_HOME??'D:/Android/Sdk','platform-tools',process.platform==='win32'?'adb.exe':'adb');
 const version=readFileSync('web/src/meta.ts','utf8').match(/APP_VERSION\s*=\s*'([^']+)'/)[1];
@@ -90,11 +91,13 @@ async function webGeometry(layout,ui){
 async function actualSwipe(selector,direction,gestureContainer){
   const region=typeof selector==='string'?page.locator(selector):selector;await region.scrollIntoViewIfNeeded();const box=await region.boundingBox();assert.ok(box);
   const gestureBox=gestureContainer?await gestureContainer.boundingBox():box;assert.ok(gestureBox);
-  const from=box.x+box.width*(direction==='left'?.82:.18),to=gestureContainer?from+gestureBox.width*.6*(direction==='left'?-1:1):box.x+box.width*(direction==='left'?.18:.82),y=box.y+box.height*.5;
-  run('shell','input','swipe',String(Math.round(from*density)),String(Math.round(y*density)),String(Math.round(to*density)),String(Math.round(y*density)),'320');
+  const vertical=direction==='up'||direction==='down',forward=direction==='left'||direction==='up';
+  const from=vertical?{x:box.x+box.width*.5,y:box.y+box.height*(forward?.82:.18)}:{x:box.x+box.width*(forward?.82:.18),y:box.y+box.height*.5};
+  const to=vertical?{x:from.x,y:box.y+box.height*(forward?.18:.82)}:{x:gestureContainer?from.x+gestureBox.width*.6*(forward?-1:1):box.x+box.width*(forward?.18:.82),y:from.y};
+  run('shell','input','swipe',String(Math.round(from.x*density)),String(Math.round(from.y*density)),String(Math.round(to.x*density)),String(Math.round(to.y*density)),'320');
   // Start a year gesture on the hint, away from editable inputs, and allow the 200 ms settlement to finish.
   await sleep(460);
-  return {direction,region:box,container:gestureBox,from:{x:from,y},to:{x:to,y},duration:320};
+  return {direction,region:box,container:gestureBox,from,to,duration:320};
 }
 async function storedLayoutState(){
   return page.evaluate(()=>new Promise((resolve,reject)=>{
@@ -115,14 +118,17 @@ async function compactLayouts(){
       const active=page.locator('.screen.active'),strip=active.locator('.date-strip');await strip.scrollIntoViewIfNeeded();await sleep(300);
       const dates=await strip.evaluate(el=>{
         const box=node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height};},viewport=box(el),items=[...el.querySelectorAll('.date-item')].map(item=>({...box(item),date:item.dataset.date}));
-        return {viewport,panel:box(el.closest('.date-panel')),itemWidth:items[0].width,visible:items.filter(item=>item.x>=viewport.x-1&&item.right<=viewport.right+1),selected:el.querySelector('[aria-pressed=true]')?.dataset.date,scrollLeft:el.scrollLeft,screenWidth:innerWidth,screenFits:el.closest('.screen').scrollWidth<=el.closest('.screen').clientWidth+1};
+        const axis=el.dataset.orientation??'horizontal',vertical=axis==='vertical';
+        return {axis,viewport,panel:box(el.closest('.date-panel')),itemWidth:items[0].width,itemHeight:items[0].height,visible:items.filter(item=>vertical?item.y>=viewport.y-1&&item.bottom<=viewport.bottom+1:item.x>=viewport.x-1&&item.right<=viewport.right+1),selected:el.querySelector('[aria-pressed=true]')?.dataset.date,position:vertical?el.scrollTop:el.scrollLeft,screenWidth:innerWidth,screenHeight:innerHeight,screenFits:el.closest('.screen').scrollWidth<=el.closest('.screen').clientWidth+1};
       });
-      assert.ok(dates.screenFits);assert.ok(dates.panel.x>=-1&&dates.panel.right<=dates.screenWidth+1);assert.ok(dates.panel.width<=592*scale+1);
-      assert.ok(dates.itemWidth>=48&&dates.itemWidth<=90*scale+1,'Dates must stay compact while preserving touch targets');assert.ok(dates.visible.length>=(orientation==='portrait'?3:6));assert.ok(dates.selected);
-      await actualSwipe(strip,'left');const movedLeft=await strip.evaluate(el=>el.scrollLeft);assert.ok(movedLeft>dates.scrollLeft+20,'A physical swipe must actually scroll the continuous dates');
-      await actualSwipe(strip,'right');const movedRight=await strip.evaluate(el=>el.scrollLeft);assert.ok(movedRight<movedLeft-20);assert.equal(await strip.locator('[aria-pressed=true]').getAttribute('data-date'),dates.selected,'Scrolling must not select an unrelated day');
-      await strip.evaluate((el,left)=>el.scrollLeft=left,dates.scrollLeft);await sleep(300);dump();capture(`compact-dates-${orientation}`);
-      layoutReport.geometry.push({orientation,dates:{...dates,physicalScroll:{left:movedLeft,right:movedRight}}});record(`${orientation} actual Android date strip stays compact at 110% and supports physical continuous swipes without selecting another day`);
+      const vertical=dates.axis==='vertical';assert.equal(dates.axis,orientation==='portrait'?'horizontal':'vertical');
+      assert.ok(dates.screenFits);assert.ok(dates.panel.x>=-1&&dates.panel.right<=dates.screenWidth+1);assert.ok(dates.panel.width<=(vertical?110:592)*scale+1);
+      assert.ok(dates.itemWidth>=48&&dates.itemHeight>=48&&dates.itemWidth<=(vertical?100:90)*scale+1,'Dates must stay compact while preserving touch targets');assert.ok(dates.visible.length>=(vertical?Math.max(1,Math.floor(dates.viewport.height/dates.itemHeight)-1):3));assert.ok(dates.selected);
+      if(vertical)assert.ok(dates.viewport.y>=-1&&dates.viewport.bottom<=dates.screenHeight+1,'Vertical date rail must remain within the Android viewport');
+      const physicalGestures=[await actualSwipe(strip,vertical?'up':'left')],forwardPosition=await strip.evaluate(el=>el.dataset.orientation==='vertical'?el.scrollTop:el.scrollLeft);assert.ok(forwardPosition>dates.position+20,'A physical swipe must actually scroll the continuous dates on their displayed axis');
+      physicalGestures.push(await actualSwipe(strip,vertical?'down':'right'));const backPosition=await strip.evaluate(el=>el.dataset.orientation==='vertical'?el.scrollTop:el.scrollLeft);assert.ok(backPosition<forwardPosition-20);assert.equal(await strip.locator('[aria-pressed=true]').getAttribute('data-date'),dates.selected,'Scrolling must not select an unrelated day');
+      await strip.evaluate((el,position)=>{if(el.dataset.orientation==='vertical')el.scrollTop=position;else el.scrollLeft=position;},dates.position);await sleep(300);dump();capture(`compact-dates-${orientation}`);
+      layoutReport.geometry.push({orientation,dates:{...dates,physicalScroll:{forward:forwardPosition,back:backPosition},physicalGestures}});record(`${orientation} actual Android ${dates.axis} continuous date strip stays compact at 110% and supports physical swipes without selecting another day`);
       await select('设置',n=>n.text==='管理课表，安排提醒，调整你的界面。');await page.locator('.screen.active [data-setting=editor]').click();
       await page.locator('.screen.active[data-screen=editor]').getByRole('button',{name:'上课时间',exact:true}).click();
       const times=page.locator('.screen.active[data-screen=times]');await times.waitFor();await page.waitForFunction(()=>{const r=document.querySelector('.screen.active[data-screen=times]')?.getBoundingClientRect();return r&&r.x>=-1&&r.right<=innerWidth+1;});
@@ -152,6 +158,58 @@ async function compactLayouts(){
     await shell.evaluate((el,saved)=>{if(saved.value)el.style.setProperty('--ui-scale',saved.value,saved.priority);else el.style.removeProperty('--ui-scale');},original);
     layoutReport.cssRestored=await shell.evaluate((el,saved)=>el.style.getPropertyValue('--ui-scale')===saved.value&&el.style.getPropertyPriority('--ui-scale')===saved.priority,original);
     writeFileSync(path.join(output,`${args['layout-prefix']??`${version}-native-compact-layout`}-results.json`),JSON.stringify(layoutReport,null,2)+'\n');
+  }
+}
+async function retainedCourseTheme(){
+  const before=await storedLayoutState(),retained=before.schedule.courses.find(item=>item.name===course);assert.ok(retained,'Course theme audit requires the existing retained course');
+  const originalTab=await page.locator('.tab-screen.active').getAttribute('data-screen'),shell=page.locator('.app-shell'),root=page.locator('html');
+  const original=await shell.evaluate(el=>({value:el.style.getPropertyValue('--ui-scale'),priority:el.style.getPropertyPriority('--ui-scale')}));
+  const attributes=await root.evaluate(el=>({mode:el.getAttribute('data-mode'),dynamic:el.getAttribute('data-dynamic'),primary:el.style.getPropertyValue('--system-primary'),priority:el.style.getPropertyPriority('--system-primary'),prefersDark:matchMedia('(prefers-color-scheme:dark)').matches}));
+  const themeReport=report.courseTheme={at:new Date().toISOString(),version,serial,pkg,apkSHA256:report.apkSHA256,installedApkSHA256:report.installedApkSHA256,scale:1.35,scope:'Read the retained synthetic course; temporarily change CSS scale/theme and restore them; never replace courses or save theme preferences.',checks:[],geometry:[],palette:[],status:'running'};
+  const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex'),record=name=>{themeReport.checks.push(name);pass(name);};
+  try{
+    await shell.evaluate(el=>el.style.setProperty('--ui-scale','1.35'));
+    for(const [orientation,value]of [['portrait',0],['landscape',1]]){
+      rotate(value);await waitFor(ui=>{const buttons=nativeButtons(ui);return buttons.length===4&&new Set(buttons.map(n=>bounds(n)[orientation==='portrait'?1:0])).size===1;},'Native navigation must settle before the retained course theme audit');
+      await select('平铺',n=>n.text==='平铺课表'||/^周[一二三四五六日]第\d+节添加临时课程$/.test(n.text));
+      const grid=page.locator('.grid-course').filter({has:page.locator('.grid-course-content strong',{hasText:retained.name})});assert.equal(await grid.count(),1);await grid.scrollIntoViewIfNeeded();
+      const date=await grid.getAttribute('data-focus-date');assert.ok(date);
+      const measure=(el,course)=>{
+        const bounds=node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height};},style=getComputedStyle(el),isGrid=el.classList.contains('grid-course'),container=el.closest(isGrid?'.week-grid':'.day-timetable');
+        const first=container.querySelector(`${isGrid?'.grid-period':'.period-row'}[data-period="${course.start}"]`),last=container.querySelector(`${isGrid?'.grid-period':'.period-row'}[data-period="${course.end}"] ${isGrid?'.grid-period-time':'.period-label'}`);
+        return {date:el.dataset.focusDate,card:bounds(el),start:bounds(first),end:bounds(last),background:style.backgroundColor,ink:getComputedStyle(el.querySelector('strong,h3')).color,radius:style.borderRadius,filter:style.filter,screen:bounds(el.closest('.screen')),screenFits:el.closest('.screen').scrollWidth<=el.closest('.screen').clientWidth+1};
+      };
+      const gridGeometry=await grid.evaluate(measure,retained);assert.ok(Math.abs(gridGeometry.card.y-gridGeometry.start.y)<2&&Math.abs(gridGeometry.card.bottom-gridGeometry.end.bottom)<2,'Weekly course matches its actual start/end section boundaries');assert.equal(gridGeometry.filter,'none');
+      await page.locator(`.grid-day[data-focus-date="${date}"]`).click();await select('列表',n=>n.text==='选择日期');
+      const list=page.locator('.day-timetable .day-course').filter({has:page.locator('h3',{hasText:retained.name})});await list.waitFor();assert.equal(await list.count(),1);await list.scrollIntoViewIfNeeded();
+      const listGeometry=await list.evaluate(measure,retained);assert.ok(Math.abs(listGeometry.card.y-listGeometry.start.y)<2&&Math.abs(listGeometry.card.bottom-listGeometry.end.bottom)<2,'Day course is a real block across its original sections');assert.ok(listGeometry.screenFits);assert.ok(listGeometry.card.x>=listGeometry.screen.x-1&&listGeometry.card.right<=listGeometry.screen.right+1);
+      assert.equal(listGeometry.date,date);assert.equal(listGeometry.background,gridGeometry.background);assert.equal(listGeometry.ink,gridGeometry.ink);assert.equal(listGeometry.radius,gridGeometry.radius);
+      themeReport.geometry.push({orientation,date,course:{id:retained.id,color:retained.color,start:retained.start,end:retained.end},grid:gridGeometry,list:listGeometry});dump();capture(`retained-course-${orientation}`);
+    }
+    record('Actual Android portrait/landscape at 135% show the retained course as the same colored block across its original day/week section boundaries');
+    await page.emulateMedia({colorScheme:'dark'});
+    for(const mode of ['light','dark','system']){
+      await root.evaluate((el,mode)=>{el.dataset.mode=mode;el.dataset.dynamic='true';el.style.setProperty('--system-primary','#8fcab1');},mode);await sleep(120);
+      const sample=await root.evaluate((el,mode)=>{
+        const style=getComputedStyle(el),canvas=document.createElement('canvas');canvas.width=canvas.height=1;const ctx=canvas.getContext('2d'),color=value=>{ctx.fillStyle=value;ctx.fillRect(0,0,1,1);return [...ctx.getImageData(0,0,1,1).data].slice(0,3);},luminance=values=>values.map(v=>{const x=v/255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;}).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0),contrast=(a,b)=>(Math.max(luminance(a),luminance(b))+.05)/(Math.min(luminance(a),luminance(b))+.05);
+        return {mode,accent:style.getPropertyValue('--accent').trim(),colors:['sage','lavender','peach','blue','rose'].map(name=>{const background=color(style.getPropertyValue(`--${name}`)),ink=color(style.getPropertyValue(`--${name}-ink`)),secondary=ink.map((v,i)=>v*.9+background[i]*.1);return {name,background,ink,titleContrast:contrast(background,ink),secondaryContrast:contrast(background,secondary)};})};
+      },mode);
+      assert.equal(sample.accent,'#8fcab1');for(const color of sample.colors){assert.ok(color.titleContrast>=4.5&&color.secondaryContrast>=4.5);assert.ok(mode==='light'?Math.min(...color.background)>200:Math.max(...color.background)<65);}themeReport.palette.push(sample);
+    }
+    record('Actual Android WebView uses all five readable light/dark/system-dark course palettes and applies the real dynamic accent');
+    await root.evaluate((el,saved)=>{for(const [name,value]of [['data-mode',saved.mode],['data-dynamic',saved.dynamic]]){if(value===null)el.removeAttribute(name);else el.setAttribute(name,value);}if(saved.primary)el.style.setProperty('--system-primary',saved.primary,saved.priority);else el.style.removeProperty('--system-primary');},attributes);
+    await page.emulateMedia({colorScheme:null});
+    await select(before.settings.timetableMode==='grid'?'平铺':'列表');if(originalTab==='settings'||originalTab==='search')await select(originalTab==='settings'?'设置':'搜索');
+    const after=await storedLayoutState();assert.deepEqual(after,before,'Retained course/theme audit must preserve courses, term, times, books and all saved preferences');themeReport.retention={beforeSHA256:hash(before),afterSHA256:hash(after),unchanged:true};themeReport.status='passed';
+  }catch(error){themeReport.status='failed';themeReport.error=error.stack;throw error;}
+  finally{
+    await root.evaluate((el,saved)=>{for(const [name,value]of [['data-mode',saved.mode],['data-dynamic',saved.dynamic]]){if(value===null)el.removeAttribute(name);else el.setAttribute(name,value);}if(saved.primary)el.style.setProperty('--system-primary',saved.primary,saved.priority);else el.style.removeProperty('--system-primary');},attributes);
+    await page.emulateMedia({colorScheme:null});await shell.evaluate((el,saved)=>{if(saved.value)el.style.setProperty('--ui-scale',saved.value,saved.priority);else el.style.removeProperty('--ui-scale');},original);
+    themeReport.cssRestored=await shell.evaluate((el,saved)=>el.style.getPropertyValue('--ui-scale')===saved.value&&el.style.getPropertyPriority('--ui-scale')===saved.priority,original);
+    themeReport.attributesRestored=await root.evaluate((el,saved)=>el.getAttribute('data-mode')===saved.mode&&el.getAttribute('data-dynamic')===saved.dynamic&&el.style.getPropertyValue('--system-primary')===saved.primary&&el.style.getPropertyPriority('--system-primary')===saved.priority,attributes);
+    themeReport.mediaRestored=await page.evaluate(original=>matchMedia('(prefers-color-scheme:dark)').matches===original,attributes.prefersDark);
+    writeFileSync(path.join(output,`${args['theme-prefix']??`${version}-native-course-theme`}-results.json`),JSON.stringify(themeReport,null,2)+'\n');
+    assert.ok(themeReport.cssRestored&&themeReport.attributesRestored&&themeReport.mediaRestored,'Temporary course theme, scale and media must all be restored');
   }
 }
 try{
@@ -229,6 +287,7 @@ try{
   ui=await editorBack();tap(ui.find(n=>n.text==='放弃修改'&&n.class==='android.widget.Button'&&visible(n)));
   ui=await waitFor(ui=>nativeButtons(ui).length===4&&ui.some(n=>n.text.includes(course)&&!n.text.includes('NativeUnsavedAudit')&&visible(n)),'Discarding must restore navigation and the unchanged saved course');capture('editor-discarded');pass('Continue preserves the draft; discard returns to the native destination and leaves the saved synthetic course unchanged');
   if(layoutChecks)await compactLayouts();
+  if(themeChecks)await retainedCourseTheme();
   report.status='passed';
 }catch(error){firstError=error;report.status='failed';report.error=error.stack;}
 finally{
