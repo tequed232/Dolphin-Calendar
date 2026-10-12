@@ -36,6 +36,12 @@ Copy-Item -LiteralPath "docs\UI_$version.md" -Destination (Join-Path $destinatio
 Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $destination 'README.md') -Force
 $evidenceBase = Join-Path $projectRoot 'build\evidence'
 $evidenceNames = @(
+    "$version-import-guide-results.json", "$version-import-guide-portrait.png", "$version-import-guide-video.png",
+    "$version-import-guide-public-media.json", "$version-apk-tutorial-isolation.json", "$version-android-build.log", "$version-resource-staging.json",
+    'import-guide-media.json', 'import-guide-static-review.json',
+    "$version-ai-demo-results.json", "$version-project-check.log", "$version-browser-ci.log",
+    "$version-native-tutorial-results.json", "$version-native-tutorial-before.png", "$version-native-tutorial-external.png",
+    "$version-native-tutorial-before.xml", "$version-native-tutorial-external.xml", "$version-native-tutorial-intent.txt",
     "$version-day-timetable-layout-results.json", "$version-date-rail-results.json", "$version-course-theme-results.json",
     "$version-day-timetable-1304x892.png", "$version-day-timetable-844x390.png", "$version-day-timetable-390x844.png", "$version-day-timetable-320x568.png",
     "$version-day-normal-portrait.png", "$version-day-normal-landscape.png", "$version-day-normal-grid.png", "$version-day-normal-rail-reading.png",

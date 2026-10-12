@@ -6,7 +6,13 @@
     "package.json", "package-lock.json", "build.gradle.kts", "settings.gradle.kts", "gradle.properties",
     "gradlew", "gradlew.bat", "gradle/wrapper/gradle-wrapper.properties",
     "gradle/wrapper/gradle-wrapper.jar", ".githooks/pre-commit", ".githooks/pre-push",
-    "web/index.html", "web/vite.config.ts", "web/tsconfig.json", "web/src/assets/icons/LICENSE"
+    "web/index.html", "web/vite.config.ts", "web/tsconfig.json", "web/src/assets/icons/LICENSE",
+    "docs/import-guide/index.html", "docs/import-guide/guide.css", "docs/import-guide/guide.js",
+    "docs/import-guide/workflow.svg", "docs/import-guide/chatgpt-step.png", "docs/import-guide/deepseek-step.png",
+    "docs/import-guide/app-import-step.png", "docs/import-guide/synthetic-schedule.json",
+    "docs/import-guide/synthetic-complete.csv",
+    "docs/import-guide/demo-source.txt", "docs/import-guide/chatgpt-demo.jpg",
+    "docs/import-guide/deepseek-demo.jpg", "docs/import-guide/import-demo.webm"
   ],
   "allowedPatterns": [
     ".github/**/*.md", ".github/workflows/*.yml", ".github/workflows/*.yaml",
@@ -19,7 +25,15 @@
     "docs/**/*.md", "docs/images/**/*.png", "docs/images/**/*.jpg", "docs/images/**/*.jpeg", "docs/images/**/*.webp", "docs/images/**/*.svg",
     "legal/**/*.txt", "legal/**/*.md"
   ],
-  "allowedBinaryPaths": ["gradle/wrapper/gradle-wrapper.jar"],
+  "allowedBinaryPaths": ["gradle/wrapper/gradle-wrapper.jar", "docs/import-guide/import-demo.webm"],
+  "binaryResources": [
+    {"path": "docs/import-guide/import-demo.webm", "mime": "video/webm", "maxBytes": 20000000},
+    {"path": "docs/import-guide/chatgpt-demo.jpg", "mime": "image/jpeg", "maxBytes": 5000000},
+    {"path": "docs/import-guide/deepseek-demo.jpg", "mime": "image/jpeg", "maxBytes": 5000000},
+    {"path": "docs/import-guide/app-import-step.png", "mime": "image/png", "maxBytes": 5000000},
+    {"path": "docs/import-guide/chatgpt-step.png", "mime": "image/png", "maxBytes": 5000000},
+    {"path": "docs/import-guide/deepseek-step.png", "mime": "image/png", "maxBytes": 5000000}
+  ],
   "deniedDirectoryNames": [
     "node_modules", "build", "dist", "out", "target", ".gradle", ".kotlin", ".idea", ".run", ".signing",
     "releases", "release", ".cache", ".npm", ".yarn", ".pnpm-store", "__pycache__", "device-backups", ".git"
@@ -31,7 +45,7 @@
     "app/src/**/assets/**", "**/.env", "**/.env.*", "**/*-wal", "**/*-shm", "**/*-journal",
     "**/*.apk", "**/*.apks", "**/*.aab", "**/*.aar", "**/*.dex", "**/*.class", "**/*.jar",
     "**/*.zip", "**/*.7z", "**/*.rar", "**/*.tar", "**/*.gz", "**/*.tgz", "**/*.bz2", "**/*.xz",
-    "**/*.exe", "**/*.dll", "**/*.so", "**/*.dylib", "**/*.wasm", "**/*.jks", "**/*.keystore", "**/*.key", "**/*.pem", "**/*.p12", "**/*.pfx",
+    "**/*.exe", "**/*.dll", "**/*.so", "**/*.dylib", "**/*.wasm", "**/*.webm", "**/*.mp4", "**/*.jks", "**/*.keystore", "**/*.key", "**/*.pem", "**/*.p12", "**/*.pfx",
     "**/*.db", "**/*.db3", "**/*.sqlite", "**/*.sqlite3", "**/*.v8", "**/*.log", "**/*.bak", "**/*.iml",
     "Dolphin Calendar全量提示词.txt"
   ],

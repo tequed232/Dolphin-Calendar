@@ -1,8 +1,9 @@
 import {readFileSync,existsSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
+import ts from 'typescript';
 // SHA-256 baseline from the supplied 2026-10-08 delivery source.
-// Historical hashes remain unchanged. Explicit UI paths include the authorized 1.4.8 refinement.
+// Historical hashes remain unchanged. Authorized import assistance is limited to UI and pure template data.
 const expected={
   "app/src/main/AndroidManifest.xml": "d09e1b0bfadd1039b2d2ce6f3bcd687414447fc4fe5ef1eefa11354bebd747d3",
   "app/src/main/java/com/dolphin/calendar/AppUpdates.kt": "29cf6c529480d16c9b61d0172db5d9c8ce3170f66cfd72bbf2c83fc872025558",
@@ -131,6 +132,9 @@ const expected={
 // Scope allowance, not a new hash baseline. Unlisted business files remain frozen.
 // Mixed UI/bridge files require review plus behavior checks.
 const reviewedUI={
+ "web/src/lib/import.ts":"1.4.9 unified AI prompt data only; parser remainder separately frozen",
+ "web/src/lib/fileImport.ts":"1.4.9 unified template data only; parser remainder separately frozen",
+ "web/src/screens/Import.tsx":"1.4.9 unified template and external tutorial presentation; original preview/commit path retained",
  "web/src/components/InfiniteDateStrip.tsx":"1.4.8 horizontal/vertical presentation of the same continuous date window",
  "web/src/components/TimetableGrid.tsx":"1.4.8 shared pure overlap presentation without changing edit or save behavior",
  "web/src/theme/tokens.css":"1.4.8 shared light/dark/system course surface and text tokens",
@@ -154,6 +158,44 @@ const reviewedUI={
  "web/src/theme/timetable.css":"Toolbar normal flow",
  "web/src/theme/useWindowInsets.ts":"Document keyboard/navigation behavior"
 };
+// These hashes came from the original, unchanged delivery source after removing
+// only its explicit prompt/template data block. They are not refreshed on edits.
+const dataScopes=[
+ {file:'web/src/lib/import.ts',block:/export const JSON_PROMPT = [\s\S]*$/,names:['JSON_PROMPT','HTML_PROMPT'],core:'13da64d4131e778e94114afd397f17c9fa873eee509f2296c54488574f0c0173',mutations:[s=>s.replace('instances>20_000','instances>200_000')]},
+ {file:'web/src/lib/fileImport.ts',block:/export const CSV_TEMPLATE=[\s\S]*?(?=export const IMPORT_FORMATS=)/,names:['CSV_TEMPLATE','CSV_TIME_TEMPLATE','JSON_TIME_TEMPLATE','CSV_TIME_NOTES','UNIFIED_CSV_TEMPLATE','UNIFIED_JSON_TEMPLATE','UNIFIED_IMPORT_NOTES'],core:'461cc3b70cd03aff9acbc5c66e2ca6fbb4191a05ac28f4c0ad2af566bbd077d5',mutations:[s=>s.replace('file.size>5_000_000','file.size>50_000_000'),s=>s.replace('single&&first!==last','false&&first!==last')]}
+];
+function literalData(node,owner){
+ if(ts.isStringLiteral(node)||ts.isNoSubstitutionTemplateLiteral(node)||ts.isNumericLiteral(node)||[ts.SyntaxKind.TrueKeyword,ts.SyntaxKind.FalseKeyword,ts.SyntaxKind.NullKeyword].includes(node.kind))return true;
+ if(ts.isIdentifier(node))return owner==='HTML_PROMPT'&&node.text==='JSON_PROMPT'||['JSON_TIME_TEMPLATE','UNIFIED_JSON_TEMPLATE'].includes(owner)&&node.text==='DEFAULT_PERIODS';
+ if(ts.isTemplateExpression(node))return node.templateSpans.every(span=>literalData(span.expression,owner));
+ if(ts.isArrayLiteralExpression(node))return node.elements.every(value=>literalData(value,owner));
+ if(ts.isObjectLiteralExpression(node))return node.properties.every(property=>ts.isPropertyAssignment(property)&&(ts.isIdentifier(property.name)||ts.isStringLiteral(property.name)||ts.isNumericLiteral(property.name))&&literalData(property.initializer,owner));
+ if(ts.isAsExpression(node))return node.type.getText()==='const'&&literalData(node.expression,owner);
+ if(ts.isCallExpression(node)&&ts.isPropertyAccessExpression(node.expression)){
+  const target=node.expression.expression,method=node.expression.name.text;
+  if(method==='join'&&ts.isArrayLiteralExpression(target))return literalData(target,owner)&&node.arguments.length===1&&ts.isStringLiteral(node.arguments[0]);
+  if(method==='stringify'&&ts.isIdentifier(target)&&target.text==='JSON')return node.arguments.length>=1&&node.arguments.length<=3&&node.arguments.every(value=>literalData(value,owner));
+ }
+ return false;
+}
+function verifyDataScope(source,scope){
+ source=source.replaceAll('\r\n','\n');const match=source.match(scope.block);assert.ok(match,scope.file+'授权常量块缺失');
+ assert.equal(createHash('sha256').update(source.replace(scope.block,'')).digest('hex'),scope.core,scope.file+'模板之外的原解析算法发生变化');
+ const ast=ts.createSourceFile(scope.file,match[0],ts.ScriptTarget.Latest,true,ts.ScriptKind.TS),seen=new Set();assert.equal(ast.parseDiagnostics.length,0,scope.file+'模板常量语法错误');
+ for(const statement of ast.statements){
+  assert.ok(ts.isVariableStatement(statement)&&(statement.declarationList.flags&ts.NodeFlags.Const)&&statement.modifiers?.length===1&&statement.modifiers[0].kind===ts.SyntaxKind.ExportKeyword,scope.file+'授权块只允许导出的纯数据常量');
+  assert.equal(statement.declarationList.declarations.length,1,scope.file+'每条模板声明必须唯一');const declaration=statement.declarationList.declarations[0];
+  assert.ok(ts.isIdentifier(declaration.name)&&scope.names.includes(declaration.name.text)&&!seen.has(declaration.name.text),scope.file+'出现未授权或重复常量');seen.add(declaration.name.text);
+  assert.ok(declaration.initializer&&literalData(declaration.initializer,declaration.name.text),scope.file+'模板块不能包含可执行逻辑');
+ }
+ for(const name of scope.names.filter(name=>!name.startsWith('UNIFIED_')))assert.ok(seen.has(name),scope.file+'原模板常量缺失：'+name);
+}
+for(const scope of dataScopes){
+ const original=readFileSync(scope.file,'utf8');verifyDataScope(original,scope);
+ for(const mutate of scope.mutations){const broken=mutate(original);assert.notEqual(broken,original,scope.file+'算法变异未生效');assert.throws(()=>verifyDataScope(broken,scope),undefined,scope.file+'算法变异未被拒绝');verifyDataScope(original,scope);}
+ const injected=original.replace(scope.block,block=>block+'\nexport function unsafeTemplateLogic(){return true;}\n');assert.throws(()=>verifyDataScope(injected,scope),undefined,scope.file+'模板块执行逻辑未被拒绝');
+ console.log('PASS '+scope.file+' 原解析算法 SHA 保留（原始通过 → 算法及执行逻辑变异拒绝 → 恢复通过）');
+}
 const changed=[],unchanged=[];
 for(const [file,sha] of Object.entries(expected)){
  if(!existsSync(file)){

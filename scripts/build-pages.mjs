@@ -12,6 +12,10 @@ if(!output.startsWith(buildRoot))throw new Error('发布目录必须位于工程
 await rm(output,{recursive:true,force:true});
 await mkdir(output,{recursive:true});
 await cp('web/dist',output,{recursive:true});
+// Documentation media is hosted on Pages; it is not bundled in the app or offline APK assets.
+await cp('docs/import-guide',path.join(output,'import-guide'),{recursive:true});
+const guide=spawnSync(process.execPath,['--import','tsx','scripts/build-import-guide.mjs'],{stdio:'inherit'});
+if(guide.status!==0)process.exit(guide.status??1);
 // Pages opens index.html: inline the compiled application and styles into that entry.
 // Images remain alongside it as local assets, also used by the offline download.
 await writeFile(path.join(output,'index.html'),await readFile('web/dist/Dolphin-Calendar-offline.html'));

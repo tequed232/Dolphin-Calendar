@@ -41,6 +41,9 @@ function selfTest(){
     const run=()=>spawnSync(process.execPath,['scripts/check-source-push.mjs','--ci'],{encoding:'utf8',env:{...process.env,GITHUB_EVENT_PATH:eventPath}});
     let result=run();if(result.status!==0)throw new Error('合成纯源码提交未能通过');
     console.log('PASS 推送完整源码提交通过');
+    const media='docs/import-guide/import-demo.webm';mkdirSync(path.join(temp,'docs/import-guide'),{recursive:true});writeFileSync(path.join(temp,media),'PK renamed synthetic archive');git(['add','-f',media]);const invalidMedia=commit('synthetic invalid tutorial media');git(['rm','--quiet',media]);commit('synthetic media deletion');
+    result=run();if(result.status===0||!result.stderr.includes(invalidMedia))throw new Error('未能拒绝后续删除的伪装 WebM 历史 blob');console.log('PASS 伪装 WebM 已删除，新增历史实际 blob 仍被拒绝');
+    git(['reset','--hard',baseline]);
     writeFileSync(path.join(temp,'payload.apk'),'synthetic artifact, not an APK');git(['add','-f','payload.apk']);const bad=commit('synthetic forbidden file');
     git(['rm','--quiet','payload.apk']);commit('synthetic deletion');
     result=run();if(result.status===0||!result.stderr.includes(bad))throw new Error('未能拒绝已在后续删除的历史 APK');

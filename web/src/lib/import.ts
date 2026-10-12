@@ -247,5 +247,16 @@ function parseTable(rows:string[][],current:Schedule):Schedule {
   if(!headers.some(h=>['课程名','课程名称','name','courseName'].includes(h))) fail('找不到课程名表头，请使用应用内的导入提示词转换');
   return normalizeSchedule({courses:rows.slice(1).filter(r=>r.some(Boolean)).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])))},current);
 }
-export const JSON_PROMPT = `请把我提供的课表整理为 JSON。不要猜测不清晰的信息，先向我询问。输出可直接导入 Dolphin Calendar 的对象：{"term":{"name":"学期名称","startDate":"YYYY-MM-DD","weeks":20},"courses":[{"name":"课程名","teacher":"教师","room":"X栋XXX号教室","day":1,"start":1,"end":2,"weeks":[1,2,3],"notes":""}]}。教室请尽量写为“16栋203号教室”；若原文是“16-203/202”，将主教室写为“16栋203号教室”，另一间写入 notes。楼名明确时可写“博学楼A203号教室”。不要把学校名写入 room；地址不完整时保留原文并提示用户核对，切勿补造数字。day 为周一=1至周日=7；start/end 为节次；weeks 逐项写明实际周次，不可丢失单双周。若不知道学期开始日期，请省略 startDate。如原文包含作息时间，请逐节输出 times:[{"start":"08:00","end":"08:45"}]，严格使用实际上课、下课时间；午休单独输出 lunchBreak:{"start":"11:40","end":"14:00"}，不计入课程节数。缺少某节完整时间时不要生成不完整的 times，可在对应课程中输出 startTime/endTime，仅修改该课程的外侧时间边界。以上时间仅为格式示例，不得编造课程或时间。`;
+export const JSON_PROMPT = `请把我提供的课程表和完整逐节作息整理成一份可直接导入 Dolphin Calendar 的 JSON。先核对资料是否齐全，再转换。
+
+需要我提供：课程表截图或文字；每日第 1–N 节各自的上课、下课时间（包括当天没有安排课程的节次）；学期名称、开学日期、学期总周数；每门课程的实际周次、单双周，以及明确的午休等休息时间。
+缺少开学日期、学期总周数、课程周次、节次或某一节的完整起止时间，或者截图看不清时，先向我列出具体问题并等待回答，不输出待猜测的 JSON。不要用今天、默认学期、示例数据或其他学校的作息补齐。只有连堂总时段不能确定每一节的边界：例如第 1–2 节的总起止时间不足以确定第 1 节下课与第 2 节上课，必须询问；禁止按总时长平均拆分、假定课间长度或把缺失时间沿用为示例时间。若用户明确确认了单节时长、课间长度和连堂构成规则，可以依这些已确认规则计算每节边界，并核对计算结果与提供的总时段一致；不能自行假定规则。只知道“每周上课”时也要确认实际起止周，不能默认整学期。
+
+资料完整后，只输出一个合法 JSON 对象，不加 Markdown 代码围栏或说明文字。对象包含 term、periods、courses 三部分：
+1. term：name 为实际学期名称，startDate 为已确认的 YYYY-MM-DD 开学日期，weeks 为已确认的学期总周数整数。
+2. periods：按第 1 节到第 N 节依次列出全部单节时间对象，每节必须有 start 和 end，格式 HH:mm。N 为实际每日节数，支持 1–24 节；不能按连堂块计数，不能漏掉没有课程的节次。仅使用提供的真实时间，检查起止先后、节次间不重叠。已明确提供的午休、课间或晚休可作为前一节的 breakAfter：{"label":"午休","start":"HH:mm","end":"HH:mm"}，必须位于相邻两节之间，不计入节数；没有明确休息时间时不要补造 breakAfter。
+3. courses：每个课程块包含 name、teacher、room、day、start、end、weeks、notes。day 为周一=1 至周日=7；start/end 为实际开始、结束节次整数。单节课使用 start=end；连续多节课使用 start<end；不连续的节次、不同星期或不同周次应拆成各自的课程块，不要把中间没有课的节次合并进连堂。weeks 必须逐项列出实际周次数字，不可丢失单双周或起止周。同一课程的起止钟点由完整 periods 确定，无需另写 startTime/endTime。
+
+保留原文课程名。教师或教室未提供时可用空字符串，不补造人名、楼栋或房间号；地址不完整时保留原文，并在 notes 提醒核对。教室优先规范为“16栋203号教室”这类楼栋与房间写法；若原文是“16-203/202”，room 写“16栋203号教室”，另一间与原文写入 notes。楼名明确时可写“博学楼A203号教室”，不要把学校名写入 room。specificDate 仅在资料明确提供单次上课日期时使用 YYYY-MM-DD，不猜测日期。
+以上字段、房间写法和 HH:mm 都只是格式说明；下载模板中的课程、日期、周次和作息也是虚构示例，不得套入我的课表。输出前逐项核对课程块数量、单节/连堂、周次、开学日期，以及 periods 是否覆盖全部实际单节。`;
 export const HTML_PROMPT = `${JSON_PROMPT}\n请将同一份 JSON 放入 HTML 的 <script type="application/json" id="dolphin-schedule"> 数据块，并另外生成可读的课表 table。表头为课程名、星期、节次、周次、教师、教室。只输出完整 HTML 文件，不加载任何外部资源或执行脚本。`;

@@ -1,5 +1,5 @@
 import {spawnSync} from 'node:child_process';
-import {existsSync,lstatSync,mkdtempSync,readFileSync,readdirSync,rmSync,writeFileSync} from 'node:fs';
+import {existsSync,lstatSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,rmSync,writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -24,9 +24,29 @@ function preparePolicy(raw){
   for(const key of ['allowedPaths','allowedPatterns','allowedBinaryPaths','deniedDirectoryNames','deniedFileNames','deniedPatterns','legacyTrackedPatterns','requiredPaths']){
     if(!Array.isArray(raw[key])||raw[key].some(value=>typeof value!=='string'||!value))throw new Error(`规则字段 ${key} 必须是非空字符串数组`);
   }
+  const resources=new Map();
+  for(const resource of raw.binaryResources??[]){
+    if(!resource||!raw.allowedPaths.includes(resource.path)||!['video/webm','image/jpeg','image/png'].includes(resource.mime)||!Number.isSafeInteger(resource.maxBytes)||resource.maxBytes<=0||resources.has(resource.path.toLowerCase()))throw new Error('二进制教程资源必须逐路径声明 MIME 与最大字节数');
+    if(resource.mime==='video/webm'&&!resource.path.endsWith('.webm')||resource.mime==='image/jpeg'&&!resource.path.endsWith('.jpg')||resource.mime==='image/png'&&!resource.path.endsWith('.png'))throw new Error('教程资源路径扩展名与 MIME 不一致');
+    resources.set(resource.path.toLowerCase(),resource);
+  }
   return {...raw,allowed:new Set(raw.allowedPaths.map(value=>value.toLowerCase())),binary:new Set(raw.allowedBinaryPaths.map(value=>value.toLowerCase())),
     directories:new Set(raw.deniedDirectoryNames.map(value=>value.toLowerCase())),names:new Set(raw.deniedFileNames.map(value=>value.toLowerCase())),
-    allow:raw.allowedPatterns.map(glob),deny:raw.deniedPatterns.map(glob),legacy:raw.legacyTrackedPatterns.map(glob)};
+    allow:raw.allowedPatterns.map(glob),deny:raw.deniedPatterns.map(glob),legacy:raw.legacyTrackedPatterns.map(glob),resources};
+}
+function resourceError(bytes,resource){
+  if(!Buffer.isBuffer(bytes)||!bytes.length||bytes.length>resource.maxBytes)return '教程媒体为空或超过逐文件大小上限';
+  if(resource.mime==='image/jpeg')return bytes.length>=4&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff&&bytes.at(-2)===0xff&&bytes.at(-1)===0xd9?null:'教程 JPEG 起止标记不符合 image/jpeg';
+  if(resource.mime==='image/png')return bytes.length>=45&&bytes.subarray(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))&&bytes.subarray(12,16).toString('ascii')==='IHDR'&&bytes.subarray(-12).equals(Buffer.from([0,0,0,0,0x49,0x45,0x4e,0x44,0xae,0x42,0x60,0x82]))?null:'教程 PNG 文件头或 IEND 结尾无效';
+  // EBML header and a WebM DocType in that header identify the single allowed
+  // recording. A renamed ZIP/APK or generic Matroska file must not pass.
+  if(bytes.length<12||!bytes.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3])))return '教程 WebM 缺少 EBML 魔数';
+  let length=1,mask=0x80;while(length<=8&&!(bytes[4]&mask)){length++;mask>>=1;}
+  if(length>8||bytes.length<5+length)return '教程 WebM EBML 头长度无效';
+  let size=BigInt(bytes[4]&(~mask&0xff));for(let i=1;i<length;i++)size=size*256n+BigInt(bytes[4+i]);
+  if(size>4096n||size===0n||size>BigInt(bytes.length-4-length))return '教程 WebM EBML 头范围无效';
+  const header=bytes.subarray(4+length,4+length+Number(size)),docType=Buffer.from([0x42,0x82,0x84,0x77,0x65,0x62,0x6d]);
+  return header.includes(docType)?null:'教程媒体 DocType 不是 video/webm';
 }
 function pathError(name,policy){
   if(!name||name.includes('\\')||name.startsWith('/')||/[\x00-\x1f\x7f:]/.test(name)||name.split('/').some(part=>!part||part==='.'||part==='..'||/[. ]$/.test(part)))return '路径不适合跨平台源码仓库';
@@ -52,7 +72,8 @@ function parseEntries(output){
   return output.split('\0').filter(Boolean).map(line=>{
     const tab=line.indexOf('\t'),header=line.slice(0,tab).split(' ');
     if(tab<0)throw new Error('无法解析 Git 文件条目');
-    return {name:line.slice(tab+1),mode:header[0],unmerged:header.length===3&&/^\d+$/.test(header[2])&&header[2]!=='0'};
+    const treeEntry=['blob','tree','commit'].includes(header[1]);
+    return {name:line.slice(tab+1),mode:header[0],oid:treeEntry?header[2]:header[1],unmerged:!treeEntry&&header.length===3&&/^\d+$/.test(header[2])&&header[2]!=='0'};
   });
 }
 function indexed(root,staged){
@@ -81,7 +102,7 @@ function walk(directory){
   }
   visit(directory);return entries;
 }
-function validate(entries,policy,{legacy=new Set(),required=false,worktree,fullEntries=entries}={}){
+function validate(entries,policy,{legacy=new Set(),required=false,worktree,readContent,fullEntries=entries}={}){
   const errors=[],warnings=[],names=new Set();
   const paths=new Map();
   for(const entry of fullEntries){
@@ -100,6 +121,12 @@ function validate(entries,policy,{legacy=new Set(),required=false,worktree,fullE
       const file=path.join(worktree,...entry.name.split('/'));
       if(!existsSync(file))reason='已跟踪源码在工作树中缺失';
       else if(!lstatSync(file).isFile()||lstatSync(file).isSymbolicLink())reason='工作树中的源码必须是普通文件';
+    }
+    if(!reason&&policy.resources.has(entry.name.toLowerCase())){
+      try{
+        if(!readContent&&!worktree)reason='教程媒体必须从实际源码快照读取内容';
+        else reason=resourceError(readContent?readContent(entry):readFileSync(path.join(worktree,...entry.name.split('/'))),policy.resources.get(entry.name.toLowerCase()));
+      }catch(error){reason='无法读取教程媒体内容：'+error.message;}
     }
     if(reason){
       if(legacy.has(entry.name)&&policy.legacy.some(rule=>rule.test(entry.name))&&!entry.unmerged&&['100644','100755'].includes(entry.mode))warnings.push(entry.name);
@@ -137,6 +164,21 @@ function selfTest(policy){
   let checks=0;
   const test=(condition,name)=>{if(!condition)throw new Error(`准入规则自检失败：${name}`);checks++;console.log(`PASS ${name}`);};
   for(const name of ['web/src/main.tsx','web/src/assets/brand/app-icon.png','app/src/main/res/drawable/ic_notification.xml','legal/APACHE-2.0.txt','gradle/wrapper/gradle-wrapper.jar','.githooks/pre-commit'])test(!pathError(name,policy),`允许 ${name}`);
+  for(const name of ['docs/import-guide/index.html','docs/import-guide/guide.css','docs/import-guide/guide.js','docs/import-guide/import-demo.webm','docs/import-guide/chatgpt-demo.jpg','docs/import-guide/deepseek-demo.jpg'])test(!pathError(name,policy),`允许逐路径教程资源 ${name}`);
+  for(const name of ['docs/import-guide/other.webm','web/src/assets/other.webm','docs/images/other.mp4','docs/import-guide/other.jpg','docs/import-guide/prompt.txt','docs/import-guide/schedule.csv','docs/import-guide/schedule.json','web/public/import-guide/import-demo.webm','app/src/main/assets/web/import-guide/import-demo.webm'])test(Boolean(pathError(name,policy)),`拒绝未授权教程或生成资源 ${name}`);
+  const video=policy.resources.get('docs/import-guide/import-demo.webm'),jpeg=policy.resources.get('docs/import-guide/chatgpt-demo.jpg');
+  const webm=Buffer.from([0x1a,0x45,0xdf,0xa3,0x87,0x42,0x82,0x84,0x77,0x65,0x62,0x6d]),image=Buffer.from([0xff,0xd8,0xff,0xe0,0xff,0xd9]);
+  test(!resourceError(webm,video),'唯一 WebM 的 EBML 与 DocType 通过');
+  test(Boolean(resourceError(Buffer.from('PK synthetic archive'),video)),'改名为 WebM 的 ZIP 被拒绝');
+  test(Boolean(resourceError(Buffer.from('MZ synthetic executable'),video)),'改名为 WebM 的可执行文件被拒绝');
+  test(Boolean(resourceError(Buffer.from([0x1a,0x45,0xdf,0xa3,0x88,0x42,0x82,0x85,0x6f,0x74,0x68,0x65,0x72]),video)),'非 WebM DocType 被拒绝');
+  test(Boolean(resourceError(Buffer.concat([webm.subarray(0,4),Buffer.from([0xff]),webm.subarray(5)]),video)),'损坏 EBML 头范围被拒绝');
+  test(Boolean(resourceError(Buffer.alloc(video.maxBytes+1),video)),'WebM 超过逐文件大小上限被拒绝');
+  test(!resourceError(image,jpeg),'逐路径 JPEG 起止标记通过');
+  test(Boolean(resourceError(Buffer.from('not a jpeg'),jpeg)),'改名为 JPEG 的文字被拒绝');
+  test(Boolean(resourceError(Buffer.concat([image,Buffer.from('payload')]),jpeg)),'JPEG 末尾追加载荷被拒绝');
+  const pngResource=policy.resources.get('docs/import-guide/app-import-step.png'),png=Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0,0,0,13,0x49,0x48,0x44,0x52]),Buffer.alloc(17),Buffer.from([0,0,0,0,0x49,0x45,0x4e,0x44,0xae,0x42,0x60,0x82])]);
+  test(!resourceError(png,pngResource),'逐路径 PNG 文件头与 IEND 通过');test(Boolean(resourceError(Buffer.from('not png'),pngResource)),'改名为 PNG 的文字被拒绝');test(Boolean(resourceError(Buffer.concat([png,Buffer.from('payload')]),pngResource)),'PNG 末尾追加载荷被拒绝');
   for(const name of ['app-debug.apk','docs/images/app.zip','web/src/unsafe.jar','app/build/source.kt','web/node_modules/source.ts','app/src/main/assets/web/index.html','.idea/misc.xml','.run/run.xml','signing.local.properties','web/src/config.key','web/src/state.sqlite-wal','Dolphin Calendar全量提示词.txt'])test(Boolean(pathError(name,policy)),`拒绝 ${name}`);
   for(const name of ['legal/Dolphin Calendar全量提示词.txt','web/src/con.ts','web/src/AUX.json','web/src/COM1.ts'])test(Boolean(pathError(name,policy)),`拒绝 ${name}`);
   test(validate([{name:'web/src/Foo.ts',mode:'100644'},{name:'web/src/foo.ts',mode:'100644'}],policy).errors.some(error=>error.includes('大小写冲突')),'拒绝文件名大小写冲突');
@@ -147,14 +189,25 @@ function selfTest(policy){
     const env={...process.env,GIT_INDEX_FILE:path.join(temp,'test-index')};
     const blob=git(temp,['hash-object','-w','--stdin'],{env,input:'// 合成测试源码\n'}).trim();
     const add=(name,mode='100644')=>git(temp,['update-index','--add','--cacheinfo',mode,blob,name],{env});
+    const readContent=entry=>{const result=spawnSync('git',['-C',temp,'cat-file','blob',entry.oid],{env,maxBuffer:32*1024*1024});if(result.status!==0)throw new Error('测试 blob 读取失败');return result.stdout;};
     const staged=()=>{
       const entries=parseEntries(git(temp,['ls-files','--stage','-z'],{env}));
       const changes=new Set(git(temp,['diff','--cached','--name-only','--diff-filter=ACMRU','-z'],{env}).split('\0').filter(Boolean));
-      return validate(entries.filter(entry=>changes.has(entry.name)),policy);
+      return validate(entries.filter(entry=>changes.has(entry.name)),policy,{readContent});
     };
     add('web/src/index-only.ts');test(staged().errors.length===0&&!existsSync(path.join(temp,'web/src/index-only.ts')),'真实临时索引中的源码可通过，未依赖工作树文件');
     add('app-debug.apk');test(staged().errors.some(error=>error.startsWith('app-debug.apk：')),'真实临时索引拒绝已暂存 APK');
     git(temp,['update-index','--force-remove','app-debug.apk'],{env});test(staged().errors.length===0,'删除禁入索引条目后可以提交');
+    const media='docs/import-guide/import-demo.webm';
+    const validBlob=git(temp,['hash-object','-w','--stdin'],{env,input:webm}).trim();
+    git(temp,['update-index','--add','--cacheinfo','100644',validBlob,media],{env});test(staged().errors.length===0,'真实索引允许唯一有效 WebM，未依赖工作树文件');
+    // The source-of-truth is the staged blob, even if a different worktree copy exists.
+    const mediaFile=path.join(temp,...media.split('/'));mkdirSync(path.dirname(mediaFile),{recursive:true});writeFileSync(mediaFile,'invalid worktree media');test(staged().errors.length===0,'有效暂存媒体不被不同工作树副本替代');
+    writeFileSync(mediaFile,webm);git(temp,['update-index','--add','--cacheinfo','100644',blob,media],{env});test(staged().errors.some(error=>error.startsWith(media+'：')),'有效工作树媒体不能掩盖实际索引中的伪装 WebM');
+    git(temp,['update-index','--add','--cacheinfo','100644',validBlob,media],{env});const tree=git(temp,['write-tree'],{env}).trim(),commit=git(temp,['-c','user.name=Source policy test','-c','user.email=test@example.invalid','commit-tree',tree],{env,input:'synthetic media commit\n'}).trim();writeFileSync(mediaFile,'invalid worktree media');test(validate(committed(temp,commit),policy,{readContent}).errors.length===0,'真实提交树读取有效媒体 blob，忽略不同工作树副本');
+    git(temp,['update-index','--force-remove',media],{env});
+    const jpg='docs/import-guide/chatgpt-demo.jpg',jpgBlob=git(temp,['hash-object','-w','--stdin'],{env,input:image}).trim();git(temp,['update-index','--add','--cacheinfo','100644',jpgBlob,jpg],{env});test(staged().errors.length===0,'真实索引允许逐路径有效 JPEG');
+    git(temp,['update-index','--add','--cacheinfo','100644',blob,jpg],{env});test(staged().errors.some(error=>error.includes('JPEG')),'真实索引拒绝伪装 JPEG');git(temp,['update-index','--force-remove',jpg],{env});
     add('web/src/link.ts','120000');test(staged().errors.some(error=>error.includes('符号链接')),'真实临时索引拒绝伪装为源码的 symlink');
     writeFileSync(path.join(temp,'README.md'),'# 合成源码快照\n');writeFileSync(path.join(temp,'payload.zip'),'synthetic archive');
     test(validate(walk(temp),policy).errors.some(error=>error.startsWith('payload.zip：')),'独立目录扫描拒绝归档文件');
@@ -172,10 +225,11 @@ function main(){
   const options=argumentsFor(process.argv.slice(2)),policy=preparePolicy(JSON.parse(readFileSync(options.policy,'utf8')));
   if(options.mode==='self-test')return selfTest(policy);
   const root=gitRoot(options.directory);
-  if(options.mode==='directory'||(options.mode==='auto'&&!root))return report(validate(walk(options.directory),policy,{required:true}),'完整源码目录');
+  if(options.mode==='directory'||(options.mode==='auto'&&!root))return report(validate(walk(options.directory),policy,{required:true,worktree:options.directory}),'完整源码目录');
   if(!root)throw new Error('staged / tracked / ref 检查要求处于 Git 仓库中；快照请使用 --directory');
-  if(options.mode==='ref'||(options.mode==='auto'&&options.strict))return report(validate(committed(root,options.ref??'HEAD'),policy,{required:!options.pathsOnly}),'严格提交树');
-  if(options.mode==='staged')return report(validate(indexed(root,true),policy,{fullEntries:indexed(root,false)}),'暂存索引新增与修改项');
+  const readContent=entry=>{const result=spawnSync('git',['-C',root,'cat-file','blob',entry.oid],{maxBuffer:32*1024*1024});if(result.error)throw result.error;if(result.status!==0)throw new Error('Git blob 读取失败');return result.stdout;};
+  if(options.mode==='ref'||(options.mode==='auto'&&options.strict))return report(validate(committed(root,options.ref??'HEAD'),policy,{required:!options.pathsOnly,readContent}),'严格提交树');
+  if(options.mode==='staged')return report(validate(indexed(root,true),policy,{fullEntries:indexed(root,false),readContent}),'暂存索引新增与修改项');
   const entries=indexed(root,false),legacy=new Set();
   if(!options.strict){
     const head=spawnSync('git',['-C',root,'ls-tree','-r','-z','--full-tree','HEAD'],{encoding:'utf8'});

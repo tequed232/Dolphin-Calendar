@@ -1,0 +1,84 @@
+{
+  "term": {
+    "name": "导入演示学期",
+    "startDate": "2026-09-07",
+    "weeks": 4
+  },
+  "periods": [
+    {
+      "start": "08:00",
+      "end": "08:45"
+    },
+    {
+      "start": "08:55",
+      "end": "09:40"
+    },
+    {
+      "start": "10:00",
+      "end": "10:45"
+    },
+    {
+      "start": "10:55",
+      "end": "11:40",
+      "breakAfter": {
+        "label": "午休",
+        "start": "11:40",
+        "end": "14:00"
+      }
+    },
+    {
+      "start": "14:00",
+      "end": "14:45"
+    },
+    {
+      "start": "14:55",
+      "end": "15:40"
+    }
+  ],
+  "courses": [
+    {
+      "color": "sage",
+      "room": "演示楼101",
+      "name": "程序设计基础",
+      "start": 1,
+      "weeks": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "end": 2,
+      "teacher": "示例老师甲",
+      "notes": "虚构课程，仅供演示",
+      "day": 1
+    },
+    {
+      "color": "lavender",
+      "room": "演示楼202",
+      "name": "学术英语",
+      "start": 3,
+      "weeks": [
+        1,
+        3
+      ],
+      "end": 3,
+      "teacher": "示例老师乙",
+      "notes": "虚构单周课程",
+      "day": 3
+    },
+    {
+      "color": "peach",
+      "room": "演示楼303",
+      "name": "设计与生活",
+      "start": 5,
+      "weeks": [
+        2,
+        4
+      ],
+      "end": 6,
+      "teacher": "示例老师丙",
+      "notes": "虚构双周课程",
+      "day": 5
+    }
+  ]
+}
