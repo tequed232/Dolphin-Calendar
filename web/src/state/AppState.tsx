@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { initialData, type AppData } from '../lib/model';
 import { loadData, saveData } from '../lib/storage';
-import { native } from '../lib/native';
+import { isNative,native } from '../lib/native';
 import { notificationCover } from '../lib/notificationCover';
 import {useHolidayReader} from './useHolidayReader';
 import {useAppUpdates} from './useAppUpdates';
@@ -27,17 +27,22 @@ export function AppProvider({children}:{children:ReactNode}) {
   const {notificationsEnabled,reminders,advance,journeyLive,pet,poke,lines,school,map,autoUpdate,directDownload}=data.settings;
   const nativeSettings=JSON.stringify({notificationsEnabled,reminders,advance,journeyLive,pet,poke,lines,school,map,autoUpdate,directDownload});
   useEffect(()=>{
-    if(!ready) return;
+    if(!ready||!isNative()) return;
     const settings=nativeSettings;
     const previous=nativeSnapshot.current;
     if(previous?.schedule===data.schedule&&previous.books===data.books&&previous.settings===settings)return;
     nativeSnapshot.current={schedule:data.schedule,books:data.books,settings};
-    let active=true;
     native('sync',{schedule:data.schedule,settings:data.settings,bookTitles:Object.fromEntries(Object.entries(data.books).map(([course,book])=>[course,book.title]))});
+  },[ready,data.schedule,nativeSettings,data.books]);
+  // Covers only change with textbooks. Course edits and reminder settings need no image decode.
+  useEffect(()=>{
+    if(!ready||!isNative())return;
+    let active=true;
     void (async()=>{
       const covers:Record<string,string>={};
       let total=0;
       for(const [course,book] of Object.entries(data.books).slice(0,128)) {
+        if(!active)return;
         if(!book.cover) continue;
         const thumb=await notificationCover(book.cover);
         if(thumb && total+thumb.length<800_000) {covers[course]=thumb;total+=thumb.length;}
@@ -45,7 +50,7 @@ export function AppProvider({children}:{children:ReactNode}) {
       if(active) native('bookCovers',{covers});
     })();
     return()=>{active=false;};
-  },[ready,data.schedule,nativeSettings,data.books]);
+  },[ready,data.books]);
   return <AppContext.Provider value={{data,ready,error,update,toast,holidayReader,appUpdates}}>{children}{message&&<div className="toast" role="status">{message}</div>}</AppContext.Provider>;
 }
 export const useApp=()=>useContext(AppContext);

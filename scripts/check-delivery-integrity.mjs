@@ -2,8 +2,9 @@ import {readFileSync,existsSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import ts from 'typescript';
+import {importReviewPatches} from './import-review-allowance.mjs';
 // SHA-256 baseline from the supplied 2026-10-08 delivery source.
-// Historical hashes remain unchanged. Authorized import assistance is limited to UI and pure template data.
+// Historical hashes remain unchanged. The 2026-10-13 review explicitly authorizes bug fixes.
 const expected={
   "app/src/main/AndroidManifest.xml": "d09e1b0bfadd1039b2d2ce6f3bcd687414447fc4fe5ef1eefa11354bebd747d3",
   "app/src/main/java/com/dolphin/calendar/AppUpdates.kt": "29cf6c529480d16c9b61d0172db5d9c8ce3170f66cfd72bbf2c83fc872025558",
@@ -131,17 +132,25 @@ const expected={
 };
 // Scope allowance, not a new hash baseline. Unlisted business files remain frozen.
 // Mixed UI/bridge files require review plus behavior checks.
-const reviewedUI={
- "web/src/lib/import.ts":"1.4.9 unified AI prompt data only; parser remainder separately frozen",
+const reviewedChanges={
+ "web/src/components/CourseEditor.tsx":"1.4.10 synchronize the temporary date and displayed weekday while editing",
+ "app/src/main/java/com/dolphin/calendar/ReminderScheduler.kt":"1.4.10 validate queued reminders against current settings, occurrences and time before delivery; isolate damaged elements",
+ "web/src/lib/storage.ts":"1.4.10 recover failed/closed IndexedDB connections and reject damaged snapshots without overwriting data",
+ "web/src/state/AppState.tsx":"1.4.10 skip Web notification thumbnails and process Android covers only when books change",
+ "web/src/state/useAppUpdates.ts":"1.4.10 prevent stale cache overwrites and clear removed releases on 404",
+ "web/src/components/ChoiceSelect.tsx":"1.4.10 keyboard selection and menu clipping within the visible keyboard/dialog bounds",
+ "web/src/components/CourseSheet.tsx":"1.4.10 return keyboard focus to the course trigger",
+ "web/src/components/ScheduleSettings.tsx":"1.4.10 lock fields during save to prevent silently discarded edits",
+ "web/src/lib/import.ts":"1.4.10 exact mixed-parity/empty-week bug fixes projected out before original algorithm hash check",
  "web/src/lib/fileImport.ts":"1.4.9 unified template data only; parser remainder separately frozen",
  "web/src/screens/Import.tsx":"1.4.9 unified template and external tutorial presentation; original preview/commit path retained",
- "web/src/components/InfiniteDateStrip.tsx":"1.4.8 horizontal/vertical presentation of the same continuous date window",
- "web/src/components/TimetableGrid.tsx":"1.4.8 shared pure overlap presentation without changing edit or save behavior",
+ "web/src/components/InfiniteDateStrip.tsx":"1.4.10 incrementally generate the existing horizontal/vertical date window without changing its dates",
+ "web/src/components/TimetableGrid.tsx":"1.4.10 memoize overlap presentation and skip unchanged pointer targets; original edit/save behavior retained",
  "web/src/theme/tokens.css":"1.4.8 shared light/dark/system course surface and text tokens",
  "web/src/theme/page-structure.css":"1.4.8 scoped spacing within the existing viewport",
  "web/src/theme/editor-experience.css":"1.4.8 scoped course detail/editor visual spacing",
- "app/src/main/java/com/dolphin/calendar/MainActivity.kt":"Native navigation host and viewport bridge",
- "web/src/App.tsx":"Primary navigation and overlay visibility",
+ "app/src/main/java/com/dolphin/calendar/MainActivity.kt":"Native navigation; 1.4.10 checked background document export and bridge parsing off UI thread",
+ "web/src/App.tsx":"Primary navigation; 1.4.10 make background screens inert while course detail is open",
  "web/src/components/CalendarPicker.tsx":"Continuous month/year navigation",
  "web/src/components/Dialog.tsx":"Root portal prevents nested UI zoom and clipping",
  "web/src/components/GlassDock.tsx":"Retired transparent Dock component",
@@ -149,10 +158,10 @@ const reviewedUI={
  "web/src/lib/native.ts":"Native navigation protocol",
  "web/src/main.tsx":"Responsive navigation stylesheet entry",
  "web/src/screens/Background.tsx":"Four-item solid navigation preview",
- "web/src/screens/Home.tsx":"In-flow toolbar and reading viewport",
+ "web/src/screens/Home.tsx":"1.4.10 memoized course/date presentation and active-screen clock; existing data and navigation retained",
  "web/src/screens/Settings.tsx":"Retire obsolete Dock controls",
- "web/src/state/useHomeFocus.ts":"Reading focus within reserved viewport",
- "web/src/theme/app.css":"Retire Dock styles and reserve content",
+ "web/src/state/useHomeFocus.ts":"1.4.10 coalesce scroll focus sampling and cancel stale samples on explicit navigation",
+ "web/src/theme/app.css":"1.4.10 allow list scrolling from course cards; historical solid navigation and reserved content retained",
  "web/src/theme/background.css":"Solid navigation preview",
  "web/src/theme/calendar.css":"Sliding month/year presentation",
  "web/src/theme/timetable.css":"Toolbar normal flow",
@@ -180,7 +189,9 @@ function literalData(node,owner){
 }
 function verifyDataScope(source,scope){
  source=source.replaceAll('\r\n','\n');const match=source.match(scope.block);assert.ok(match,scope.file+'授权常量块缺失');
- assert.equal(createHash('sha256').update(source.replace(scope.block,'')).digest('hex'),scope.core,scope.file+'模板之外的原解析算法发生变化');
+ let projected=source;
+ if(scope.file==='web/src/lib/import.ts')for(const patch of importReviewPatches){assert.equal(projected.split(patch.after).length,2,'授权修复必须精确且唯一');projected=projected.replace(patch.after,patch.before);}
+ assert.equal(createHash('sha256').update(projected.replace(scope.block,'')).digest('hex'),scope.core,scope.file+'授权修复之外的原解析算法发生变化');
  const ast=ts.createSourceFile(scope.file,match[0],ts.ScriptTarget.Latest,true,ts.ScriptKind.TS),seen=new Set();assert.equal(ast.parseDiagnostics.length,0,scope.file+'模板常量语法错误');
  for(const statement of ast.statements){
   assert.ok(ts.isVariableStatement(statement)&&(statement.declarationList.flags&ts.NodeFlags.Const)&&statement.modifiers?.length===1&&statement.modifiers[0].kind===ts.SyntaxKind.ExportKeyword,scope.file+'授权块只允许导出的纯数据常量');
@@ -194,19 +205,19 @@ for(const scope of dataScopes){
  const original=readFileSync(scope.file,'utf8');verifyDataScope(original,scope);
  for(const mutate of scope.mutations){const broken=mutate(original);assert.notEqual(broken,original,scope.file+'算法变异未生效');assert.throws(()=>verifyDataScope(broken,scope),undefined,scope.file+'算法变异未被拒绝');verifyDataScope(original,scope);}
  const injected=original.replace(scope.block,block=>block+'\nexport function unsafeTemplateLogic(){return true;}\n');assert.throws(()=>verifyDataScope(injected,scope),undefined,scope.file+'模板块执行逻辑未被拒绝');
- console.log('PASS '+scope.file+' 原解析算法 SHA 保留（原始通过 → 算法及执行逻辑变异拒绝 → 恢复通过）');
+ console.log('PASS '+scope.file+' 授权修复之外的原解析算法 SHA 保留（通过 → 未授权算法及执行逻辑变异拒绝 → 恢复通过）');
 }
 const changed=[],unchanged=[];
 for(const [file,sha] of Object.entries(expected)){
  if(!existsSync(file)){
   assert.equal(file,'web/src/components/GlassDock.tsx','交付包源码未经允许删除：'+file);
-  changed.push({file,status:'removed',reason:reviewedUI[file]});continue;
+  changed.push({file,status:'removed',reason:reviewedChanges[file]});continue;
  }
  let bytes=readFileSync(file);
  if(/\.(ts|tsx|css|kt|java|xml|json|svg)$/.test(file)){let source=bytes.toString('utf8').replaceAll('\r\n','\n');if(file==='web/src/meta.ts')source=source.replace(/APP_VERSION = '[^']+'/,"APP_VERSION = '1.4.3'");bytes=Buffer.from(source);}
  const actual=createHash('sha256').update(bytes).digest('hex');
- if(actual!==sha){assert.ok(reviewedUI[file],'未获本轮 UI 修改授权的交付包核心文件发生变化：'+file);changed.push({file,status:'modified',reason:reviewedUI[file]});}
+ if(actual!==sha){assert.ok(reviewedChanges[file],'未获本轮修改授权的交付包核心文件发生变化：'+file);changed.push({file,status:'modified',reason:reviewedChanges[file]});}
  else unchanged.push(file);
 }
-console.log('PASS 历史交付包基线保留：'+Object.keys(expected).length+' 个文件；'+unchanged.length+' 个仍完全一致，'+changed.length+' 个已列明 UI 变更。');
-for(const item of changed)console.log('REVIEWED UI '+item.status+' '+item.file+' — '+item.reason);
+console.log('PASS 历史交付包基线保留：'+Object.keys(expected).length+' 个文件；'+unchanged.length+' 个仍完全一致，'+changed.length+' 个已列明授权变更。');
+for(const item of changed)console.log('REVIEWED '+item.status+' '+item.file+' — '+item.reason);

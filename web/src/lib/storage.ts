@@ -4,17 +4,29 @@ import {normalizeHolidayDays,normalizeHolidayRanges} from './holidays';
 const DATABASE = 'dolphin-calendar';
 let connection: Promise<IDBDatabase> | undefined;
 function open() {
-  return connection ??= new Promise<IDBDatabase>((resolve,reject)=>{
+  if(connection)return connection;
+  const opening = new Promise<IDBDatabase>((resolve,reject)=>{
+    let settled=false;
     const request=indexedDB.open(DATABASE,1);
     request.onupgradeneeded=()=>{ if(!request.result.objectStoreNames.contains('state')) request.result.createObjectStore('state'); };
-    request.onsuccess=()=>resolve(request.result); request.onerror=()=>reject(request.error);
-    request.onblocked=()=>reject(new Error('数据库升级被另一个窗口阻止，请关闭其他页面后重试'));
+    request.onsuccess=()=>{
+      const db=request.result;if(settled){db.close();return;}settled=true;
+      const release=()=>{if(connection===opening)connection=undefined;};
+      db.onversionchange=()=>{db.close();release();};db.onclose=release;
+      resolve(db);
+    };
+    request.onerror=()=>{settled=true;reject(request.error??new Error('数据库暂时无法打开'));};
+    request.onblocked=()=>{settled=true;reject(new Error('数据库升级被另一个窗口阻止，请关闭其他页面后重试'));};
   });
+  connection=opening;
+  void opening.catch(()=>{if(connection===opening)connection=undefined;});
+  return opening;
 }
 export async function loadData():Promise<AppData> {
   const db=await open(); return new Promise((resolve,reject)=>{
     const r=db.transaction('state').objectStore('state').get('app');
     r.onsuccess=()=>{
+      try{
       const defaults=initialData(),saved=r.result as AppData|undefined;
       if(saved&&saved.schema!==1) {reject(new Error('此数据来自更新版本，请升级应用后打开'));return;}
       if(!saved){resolve(defaults);return;}
@@ -31,6 +43,7 @@ export async function loadData():Promise<AppData> {
       const holidayCalendarIds=Array.isArray(saved.holidayCalendarIds)?[...new Set(saved.holidayCalendarIds.filter(id=>typeof id==='string'&&id.length>0))].sort():[];
       const holidaySourceNames=Array.isArray(saved.holidaySourceNames)?saved.holidaySourceNames.filter(name=>typeof name==='string'):[];
       resolve({...defaults,...saved,schedule:migrateSchedule(saved.schedule),background,appearanceRevision:2,holidays:normalizeHolidayDays(saved.holidays).slice(-12000),holidayRanges:normalizeHolidayRanges(saved.holidayRanges).slice(-6),holidayCalendarIds,holidaySourceNames,settings:{...migrateDisplay(settings),holidayMarkers:!!settings.holidayMarkers,backgroundEnabled:!!background&&!!settings.backgroundEnabled}});
+      }catch(error){reject(error);}
     };r.onerror=()=>reject(r.error);
   });
 }

@@ -7,6 +7,7 @@ export type NormalizeOptions = {allowEmpty?:boolean;preserveCourseIds?:boolean};
 const obj = (v: unknown): Dict => v && typeof v === 'object' && !Array.isArray(v) ? v as Dict : {};
 const pick = (o: Dict, ...keys: string[]) => keys.map(k=>o[k]).find(v=>v!==undefined && v!==null);
 const str = (v: unknown) => v==null?'':String(v).normalize('NFKC').trim();
+const missingWeeks = (v:unknown) => v==null||!Array.isArray(v)&&str(v)==='';
 function fail(message: string): never { throw new Error(message); }
 /** The application's own export is a complete snapshot, including deliberately hidden courses. */
 function isScheduleBackup(data:Dict,term:Dict):boolean {
@@ -25,13 +26,14 @@ function validatePeriods(periods:Period[],allowUntimed:boolean):Period[] {
   return periods;
 }
 export function parseNumbers(value: unknown, max: number, label: string): number[] {
-  if(Array.isArray(value)) return [...new Set(value.flatMap(v=>parseNumbers(v,max,label)))].sort((a,b)=>a-b);
+  if(Array.isArray(value)) {if(!value.length)fail(`${label}没有可用数字`);return [...new Set(value.flatMap(v=>parseNumbers(v,max,label)))].sort((a,b)=>a-b);}
   let s = str(value).replace(/[第周节\s]/g,'').replace(/[，、；;]/g,',').replace(/[~～至—–]/g,'-');
   if(label==='周次'&&/^(?:单|双|每|全部|全|全年|全学年)$/.test(s))s=`1-${max}${s==='单'||s==='双'?s:''}`;
-  const parity = /单/.test(s)?1:/双/.test(s)?0:null; s=s.replace(/[单双()（）]/g,'');
   if(!s) return fail(`${label}不能为空`);
   const result: number[] = [];
-  for(const part of s.split(',')) {
+  for(const segment of s.split(',')) {
+    if(/单/.test(segment)&&/双/.test(segment))fail(`${label}的同一段不能同时指定单双周`);
+    const parity=/单/.test(segment)?1:/双/.test(segment)?0:null,part=segment.replace(/[单双()（）]/g,'');
     if(!/^\d+(?:-\d+)?$/.test(part)) fail(`${label}格式错误：${str(value)}`);
     const [from,to=from] = part.split('-').map(Number);
     if(from<1 || to>max || from>to) fail(`${label}必须在 1–${max} 范围内，且起止顺序正确`);
@@ -168,7 +170,7 @@ export function normalizeSchedule(raw: unknown, current: Schedule, options:Norma
   };
   const retainsCurrentCourses=!!options.preserveCourseIds&&input.length===current.courses.length&&input.every(item=>retainedCourse(obj(item)));
   // 先按合理上限解析显式周次，再确定学期长度；不拿默认 20 周裁掉真实课程。
-  const explicitWeeks=input.map((item,i)=>{const c=obj(item),v=pick(c,'weeks','week','weekRange','weeksText','周次');if(v==null||str(v)===''||/^(?:单周|双周|每周|全周|全部|全年|全学年)$/.test(str(v)))return null;try{return parseNumbers(v,999,'周次');}catch(e){fail(`第 ${i+1} 条课程：${(e as Error).message}`);}});
+  const explicitWeeks=input.map((item,i)=>{const c=obj(item),v=pick(c,'weeks','week','weekRange','weeksText','周次');if(backup&&Array.isArray(v)&&!v.length)return [];if(missingWeeks(v)||!Array.isArray(v)&&/^(?:单周|双周|每周|全周|全部|全年|全学年)$/.test(str(v)))return null;try{return parseNumbers(v,999,'周次');}catch(e){fail(`第 ${i+1} 条课程：${(e as Error).message}`);}});
   const detected=explicitWeeks.reduce((max,values)=>Math.max(max,...(values??[])),0);
   if(declaredWeeks==null){weeks=Math.max(current.term.weeks,detected);notes.push(detected>current.term.weeks?`已从课程周次推断这份课表为 ${weeks} 周。`:'文件未标明学期周数，保留当前配置。');}
   else if(detected>weeks&&!retainsCurrentCourses&&!backup){notes.push(`课程包含第 ${detected} 周，学期长度已由 ${weeks} 周扩展为 ${detected} 周。`);weeks=detected;}
@@ -184,14 +186,14 @@ export function normalizeSchedule(raw: unknown, current: Schedule, options:Norma
       const sectionLimit=preserved||backup?MAX_PERIODS:periods.length;
       const nums=!c._matrix&&sections!==undefined?parseNumbers(sections,sectionLimit,'节次'):parseNumbers(`${pick(c,'start','startPeriod','startSection','section','periodStart','节次起')??''}-${pick(c,'end','endPeriod','endSection','section','periodEnd','节次止')??pick(c,'start','startPeriod','startSection','section','periodStart','节次起')??''}`,sectionLimit,'节次');
       if(nums.length!==nums.at(-1)!-nums[0]+1) fail('同一课程的节次必须连续，请拆成多条课程');
-      const weekValue=pick(c,'weeks','week','weekRange','weeksText','周次');if(weekValue==null||str(weekValue)==='')defaultedWeeks++;
+      const weekValue=pick(c,'weeks','week','weekRange','weeksText','周次');if(missingWeeks(weekValue))defaultedWeeks++;
       const originalRoom=str(pick(c,'room','classroom','location','place','教室'));
       const location=preserved||backup?{room:originalRoom,incomplete:false,multiple:false}:normalizeRoom(originalRoom);
       if(location.incomplete)notes.push(`第 ${i+1} 条课程的教室“${originalRoom}”不完整，请在导入后手动核对；楼栋明确时仅导航到楼栋。`);
       if(location.room!==originalRoom)normalizedRooms++;
       if(location.multiple)multipleRooms++;
       const originalNote=location.multiple?`原始教室：${originalRoom}`:'';
-      const value: Course={id:preserveCourseIds&&typeof c.id==='string'&&c.id?c.id:`course-${i}-${crypto.randomUUID()}`,name,teacher:str(pick(c,'teacher','teacherName','教师','老师')),room:location.room,day:parseDay(pick(c,'day','weekday','weekDay','dayOfWeek','星期','周几')),start:nums[0],end:nums.at(-1)!,weeks:explicitWeeks[i]??parseNumbers(weekValue==null||str(weekValue)===''?`1-${weeks}`:weekValue,weeks,'周次'),color:PALETTE.includes(str(c.color))?str(c.color):PALETTE[i%PALETTE.length],notes:[str(pick(c,'notes','note','备注')),originalNote].filter(Boolean).join('\n')};
+      const value: Course={id:preserveCourseIds&&typeof c.id==='string'&&c.id?c.id:`course-${i}-${crypto.randomUUID()}`,name,teacher:str(pick(c,'teacher','teacherName','教师','老师')),room:location.room,day:parseDay(pick(c,'day','weekday','weekDay','dayOfWeek','星期','周几')),start:nums[0],end:nums.at(-1)!,weeks:explicitWeeks[i]??parseNumbers(missingWeeks(weekValue)?`1-${weeks}`:weekValue,weeks,'周次'),color:PALETTE.includes(str(c.color))?str(c.color):PALETTE[i%PALETTE.length],notes:[str(pick(c,'notes','note','备注')),originalNote].filter(Boolean).join('\n')};
       if(c.temporary===true)value.temporary=true;
       if(c.specificDate){const date=str(c.specificDate);if(!validDate(date))fail('课程日期无效');value.specificDate=date;value.day=((new Date(date+'T12:00:00').getDay()+6)%7)+1;}
       courses.push(preserved?{...preserved}:value);

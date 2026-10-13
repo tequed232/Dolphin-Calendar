@@ -12,3 +12,14 @@ export function layoutCourses(courses:Course[]){
  }
  finishGroup();return positioned;
 }
+
+/** Precompute each column once per occurrence change, not once per render. */
+export function weekGridPresentation(occurrences:{course:Course;date:string}[],dayKeys:string[],periodCount:number){
+ const columns=new Map(dayKeys.map(date=>[date,{courses:[] as Course[],occupied:Array<boolean>(periodCount).fill(false)}]));
+ for(const {course,date} of occurrences){
+  const column=columns.get(date);if(!column)continue;
+  column.courses.push(course);
+  for(let section=Math.max(1,course.start);section<=Math.min(periodCount,course.end);section++)column.occupied[section-1]=true;
+ }
+ return dayKeys.map(date=>{const column=columns.get(date)!;return {date,occupied:column.occupied,positioned:layoutCourses(column.courses)};});
+}

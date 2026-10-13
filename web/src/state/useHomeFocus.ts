@@ -7,7 +7,7 @@ export function useHomeFocus({schedule,mode,ready,overlayOpen,layoutEditing}:Opt
  const roots={list:listRoot,grid:gridRoot},headers={list:listControls,grid:gridControls};
  const root=mode?roots[mode]:undefined;
  const [focus,setFocus]=useState<ViewFocus>(()=>({date:dateKey(new Date()),sectionIndex:1,source:'initial'}));
- const current=useRef(focus),requested=useRef<ViewFocus|null>(null),initialized=useRef(false),interacted=useRef(false),previousMode=useRef(mode),restoring=useRef(false),restoreFrame=useRef(0);
+ const current=useRef(focus),requested=useRef<ViewFocus|null>(null),initialized=useRef(false),interacted=useRef(false),previousMode=useRef(mode),restoring=useRef(false),restoreFrame=useRef(0),captureFrame=useRef(0),horizontalCapture=useRef(false);
  const context=useRef({schedule,mode,overlayOpen,layoutEditing});context.current={schedule,mode,overlayOpen,layoutEditing};current.current=focus;
  function remember(next:ViewFocus){current.current=next;setFocus(old=>old.date===next.date&&old.sectionIndex===next.sectionIndex&&old.courseId===next.courseId&&old.source===next.source?old:next);}
  function readingArea(){
@@ -41,7 +41,14 @@ export function useHomeFocus({schedule,mode,ready,overlayOpen,layoutEditing}:Opt
   }
   return current.current;
  }
+ function cancelCapture(){cancelAnimationFrame(captureFrame.current);captureFrame.current=0;horizontalCapture.current=false;}
+ function scheduleCapture(horizontal=false){
+  horizontalCapture.current||=horizontal;
+  if(captureFrame.current)return;
+  captureFrame.current=requestAnimationFrame(()=>{const horizontal=horizontalCapture.current;captureFrame.current=0;horizontalCapture.current=false;capture(horizontal);});
+ }
  function selectDate(date:string){
+  cancelCapture();
   interacted.current=true;
   const grid=context.current.mode==='grid',sameWeek=dateKey(monday(parseDate(date)))===dateKey(monday(parseDate(current.current.date)));
   const next:ViewFocus={date,sectionIndex:current.current.sectionIndex,source:'date'};
@@ -50,8 +57,8 @@ export function useHomeFocus({schedule,mode,ready,overlayOpen,layoutEditing}:Opt
   requested.current=grid&&!sameWeek?next:null;
   remember(next);
  }
- function rememberCourse(course:Course,date:string){interacted.current=true;remember({date,sectionIndex:course.start,courseId:course.id,source:'selection'});}
- function prepareSwitch(){interacted.current=true;capture();}
+ function rememberCourse(course:Course,date:string){cancelCapture();interacted.current=true;remember({date,sectionIndex:course.start,courseId:course.id,source:'selection'});}
+ function prepareSwitch(){cancelCapture();interacted.current=true;capture();}
  useLayoutEffect(()=>{
   if(!ready||!mode||overlayOpen||!root?.current)return;
   if(!initialized.current){initialized.current=true;if(!interacted.current){const first=initialHomeFocus(schedule,new Date());requested.current=first;remember(first);return;}}
@@ -76,12 +83,12 @@ export function useHomeFocus({schedule,mode,ready,overlayOpen,layoutEditing}:Opt
   const scroll=(event:Event)=>{
    const active=context.current.mode?roots[context.current.mode].current?.closest<HTMLElement>('.screen'):null;
    if(event.currentTarget!==active||!active)return;
-   if(!restoring.current&&context.current.mode&&!context.current.overlayOpen){interacted.current=true;capture();}
+   if(!restoring.current&&context.current.mode&&!context.current.overlayOpen){interacted.current=true;scheduleCapture();}
   };
   const horizontal=gridRoot.current?.querySelector<HTMLElement>('.week-grid-scroll');
-  const pan=()=>{if(context.current.mode==='grid'&&!restoring.current&&!context.current.overlayOpen){interacted.current=true;capture(true);}};
+  const pan=()=>{if(context.current.mode==='grid'&&!restoring.current&&!context.current.overlayOpen){interacted.current=true;scheduleCapture(true);}};
   horizontal?.addEventListener('scroll',pan,{passive:true});
-  screens.forEach(screen=>screen.addEventListener('scroll',scroll,{passive:true}));return()=>{cancelAnimationFrame(restoreFrame.current);screens.forEach(screen=>screen.removeEventListener('scroll',scroll));horizontal?.removeEventListener('scroll',pan);};
+  screens.forEach(screen=>screen.addEventListener('scroll',scroll,{passive:true}));return()=>{cancelCapture();cancelAnimationFrame(restoreFrame.current);screens.forEach(screen=>screen.removeEventListener('scroll',scroll));horizontal?.removeEventListener('scroll',pan);};
  },[]);
  return {roots,headers,focus,selectDate,rememberCourse,prepareSwitch};
 }

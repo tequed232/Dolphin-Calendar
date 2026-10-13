@@ -16,6 +16,10 @@ export function CourseEditor({course,onClose,seed}:{course:Course|null;onClose:(
   const lock=useRef(false),nameInput=useRef<HTMLInputElement>(null),weeksInput=useRef<HTMLInputElement>(null),periodFields=useRef<HTMLDivElement>(null),id=useId();
   const dirty=JSON.stringify(draft)!==JSON.stringify(initial)||weeks!==compactWeeks(initial.weeks),guard=useDiscardGuard(dirty,onClose,busy);
   function patch(key:keyof Course,value:string|number){setDraft(d=>({...d,[key]:value}));setErrors(current=>({...current,[key==='start'||key==='end'?'periods':key]:undefined,save:undefined}));}
+  function changeDate(value:string){
+    setDraft(previous=>({...previous,specificDate:value,...(validDate(value)?{day:((parseDate(value).getDay()+6)%7)+1}:{})}));
+    setErrors(current=>({...current,weeks:undefined,save:undefined}));
+  }
   async function save(allowConflict=false){
     if(lock.current)return false;
     const next:Errors={};let parsed:number[]=[];
@@ -71,7 +75,7 @@ export function CourseEditor({course,onClose,seed}:{course:Course|null;onClose:(
       {draft.temporary?<ChoiceSelect label="持续节数" value={draft.end-draft.start+1} onChange={value=>patch('end',draft.start+Number(value)-1)} options={Array.from({length:Math.max(0,data.schedule.periods.length-draft.start+1)},(_,i)=>({value:i+1,label:`${i+1} 节`}))}/>:<ChoiceSelect label="结束节次" value={draft.end} onChange={value=>patch('end',Number(value))} options={periodChoices}/>}
     </div>
     {errors.periods&&<p className="editor-period-error" id={`${id}-periods`} role="alert">{errors.periods}</p>}
-    {draft.temporary&&<label className="field">日期（留空按周次重复）<input type="date" value={draft.specificDate??''} onChange={e=>patch('specificDate',e.target.value||'')}/></label>}
+    {draft.temporary&&<label className="field">日期（留空按周次重复）<input type="date" value={draft.specificDate??''} onChange={e=>changeDate(e.target.value)}/></label>}
     {!draft.specificDate&&<><label className="field">周次<input ref={weeksInput} value={weeks} onChange={e=>{setWeeks(e.target.value);setErrors(current=>({...current,weeks:undefined,save:undefined}));}} placeholder="例如 1-16 或 1-16单" aria-invalid={!!errors.weeks} aria-describedby={`${id}-weeks-help${errors.weeks?` ${id}-weeks-error`:''}`}/></label>{errors.weeks&&<p className="field-error" id={`${id}-weeks-error`} role="alert">{errors.weeks}</p>}
     <p className="book-field-help" id={`${id}-weeks-help`}>已默认选择本学期全部 {data.schedule.term.weeks} 周。可填写“1-16”“1,3,5”或“1-16单”。</p>
     </>}

@@ -6,7 +6,7 @@ import {gridRows,weekOccurrences,closestSection} from '../lib/gridLayout';
 import {coursesConflict,periodRest} from '../lib/scheduleTime';
 import {Dialog} from './Dialog';
 import {CurrentTimeLine} from './CurrentTimeLine';
-import {layoutCourses} from './timetablePresentation';
+import {weekGridPresentation} from './timetablePresentation';
 const THRESHOLD=8,HOLD=500;
 type Gesture={course:Course;date:string;edge:'start'|'end'|'move';x:number;y:number;rowStarts:number[];rowEnds:number[];columnStep:number;pointerId:number;next:Course;moved:boolean};
 export function TimetableGrid({now,showTimeLine,statusHost,selected,interactive,create,view,focusCourse,selectDate,onEditingChange}:{now:number;showTimeLine:boolean;statusHost:HTMLElement|null;selected:string;interactive:boolean;create:(seed:Partial<Course>)=>void;view:(course:Course,date:string)=>void;focusCourse:(course:Course,date:string)=>void;selectDate:(date:string)=>void;onEditingChange:(editing:boolean)=>void}){
@@ -14,9 +14,10 @@ export function TimetableGrid({now,showTimeLine,statusHost,selected,interactive,
  const [selectedCourseId,setSelectedCourseId]=useState<string|null>(null),[gesture,setGesture]=useState<Gesture|null>(null),[pending,setPending]=useState<Course|null>(null),[conflicts,setConflicts]=useState<Course[]>([]),[saving,setSaving]=useState(false);
  const grid=useRef<HTMLDivElement>(null),selectedId=useRef<string|null>(null),active=useRef<Gesture|null>(null),hold=useRef<ReturnType<typeof setTimeout>|undefined>(undefined),press=useRef<{x:number;y:number}|null>(null),ignoreClick=useRef(false),lock=useRef(false);
  // The date-strip preference must not change a weekly grid's columns on selection.
- const base=monday(parseDate(selected)),dayCount=7,days=Array.from({length:dayCount},(_,i)=>addDays(base,i));
- const weekKey=dateKey(base),rows=useMemo(()=>gridRows(schedule.periods),[schedule.periods]);
+ const weekKey=dateKey(monday(parseDate(selected))),dayCount=7,base=useMemo(()=>parseDate(weekKey),[weekKey]),days=useMemo(()=>Array.from({length:dayCount},(_,i)=>addDays(base,i)),[base]);
+ const rows=useMemo(()=>gridRows(schedule.periods),[schedule.periods]);
  const weekly=useMemo(()=>weekOccurrences(schedule,weekKey),[schedule,weekKey]);
+ const courseById=useMemo(()=>new Map(schedule.courses.map(course=>[course.id,course])),[schedule.courses]);
  const isLayoutEditing=selectedCourseId!==null;
  function cancelGesture(){clearTimeout(hold.current);press.current=null;const value=active.current;active.current=null;setGesture(null);if(value&&grid.current?.hasPointerCapture(value.pointerId))grid.current.releasePointerCapture(value.pointerId);}
  function exit(){cancelGesture();selectedId.current=null;setSelectedCourseId(null);}
@@ -63,6 +64,8 @@ export function TimetableGrid({now,showTimeLine,statusHost,selected,interactive,
   const end=value.edge==='start'?value.course.end:value.edge==='end'?Math.max(value.course.start,Math.min(schedule.periods.length,value.course.end+dy)):start+length;
   const day=value.edge==='move'?Math.max(1,Math.min(dayCount,value.course.day+dx)):value.course.day;
   const next={...value.course,start,end,day,...(value.course.specificDate?{specificDate:dateKey(addDays(base,day-1))}:{})};
+  // Pointer motion inside the same section/day needs no new layout or render.
+  if(value.moved&&next.start===value.next.start&&next.end===value.next.end&&next.day===value.next.day)return;
   active.current={...value,next,moved:true};setGesture(active.current);
  }
  function finish(e:PointerEvent<HTMLDivElement>,cancel=false){
@@ -70,17 +73,17 @@ export function TimetableGrid({now,showTimeLine,statusHost,selected,interactive,
   if(value?.pointerId!==e.pointerId)return;cancelGesture();
   if(value.moved&&!cancel&&(value.next.start!==value.course.start||value.next.end!==value.course.end||value.next.day!==value.course.day))void persist(value.next);
  }
- const occurrences=weekly.map(item=>gesture?.course.id===item.course.id?{course:gesture.next,date:dateKey(addDays(base,gesture.next.day-1))}:item);
+ const occurrences=useMemo(()=>gesture?weekly.map(item=>gesture.course.id===item.course.id?{course:gesture.next,date:dateKey(addDays(base,gesture.next.day-1))}:item):weekly,[weekly,gesture,base]);
+ const columns=useMemo(()=>weekGridPresentation(occurrences,days.map(dateKey),schedule.periods.length),[occurrences,days,schedule.periods.length]);
  return <>{statusHost&&createPortal(<div className="layout-status"><p className="layout-hint" role="status">{isLayoutEditing?'拖动课程或上下把手；点空白或返回退出。':'点击查看，长按拖动；上下把手调整节次。'}</p>{isLayoutEditing&&<button className="text-button" onClick={exit}>完成</button>}</div>,statusHost)}<div className="week-grid-scroll"><div ref={grid} className="week-grid" data-layout-editing={isLayoutEditing} data-selected-course={selectedCourseId??''} style={{gridTemplateColumns:`48px repeat(${days.length},minmax(56px,1fr))`,gridTemplateRows:`48px ${rows.map(row=>`${row.height}px`).join(' ')}`}} aria-label="平铺课表" onPointerDownCapture={()=>{ignoreClick.current=false;}} onPointerMove={move} onPointerUp={e=>finish(e)} onPointerCancel={e=>finish(e,true)} onClick={e=>{if(!ignoreClick.current&&!((e.target as HTMLElement).closest('.grid-course')))exit();}}>
   <CurrentTimeLine root={grid} periods={schedule.periods} now={now} visible={showTimeLine} mode="grid"/>
   <div className="grid-month">{base.getMonth()+1}月</div>
   {days.map((date,index)=><button key={index} className={`grid-day ${dateKey(date)===selected?'selected':''}`} data-focus-date={dateKey(date)} aria-label={`选择${dateKey(date)}`} style={{gridColumn:index+2,gridRow:1}} onClick={()=>{exit();selectDate(dateKey(date));}}><span>周{'一二三四五六日'[index]}</span><strong>{date.getDate()}</strong></button>)}
   {schedule.periods.map((period,i)=>{const rest=periodRest(schedule.periods,i);return <div key={i} data-period={i+1} data-break-height={rows[i].breakHeight} data-focus-kind="section" data-focus-section={i+1} data-focus-date={selected} className="grid-period" style={{gridColumn:1,gridRow:i+2}}><div className="grid-period-time" style={{height:rows[i].lesson}}><strong>{i+1}</strong>{settings.showTimes!==false&&<><small>{period.start}</small><small>{period.end}</small></>}</div>{rest&&<small className="grid-break-label" title={`${rest.label} ${rest.start}–${rest.end}`} aria-label={`${rest.label} ${rest.start}–${rest.end}`}>{rest.label}</small>}</div>;})}
-  {days.map((date,column)=>{
-   const key=dateKey(date),courses=occurrences.filter(item=>item.date===key).map(item=>item.course),positioned=layoutCourses(courses);
+  {columns.map(({date:key,occupied,positioned},column)=>{
    return <div className="grid-column-fragment" key={key}>
-    {schedule.periods.map((_,i)=>!courses.some(c=>c.start<=i+1&&c.end>=i+1)&&<button key={i} className="grid-empty" aria-label={`周${'一二三四五六日'[column]}第${i+1}节添加临时课程`} style={{gridColumn:column+2,gridRow:i+2,marginBottom:rows[i].breakHeight}} onClick={()=>{if(selectedId.current){exit();return;}create({day:column+1,start:i+1,end:i+1,specificDate:key});}}><span>+</span></button>)}
-    {positioned.map(({course:current,lane,lanes})=>{const course=data.schedule.courses.find(c=>c.id===current.id)!,cardHeight=rows.slice(current.start-1,current.end).reduce((sum,row)=>sum+row.height,0)-rows[current.end-1].breakHeight+3*(current.end-current.start),editing=interactive&&selectedCourseId===course.id;
+    {schedule.periods.map((_,i)=>!occupied[i]&&<button key={i} className="grid-empty" aria-label={`周${'一二三四五六日'[column]}第${i+1}节添加临时课程`} style={{gridColumn:column+2,gridRow:i+2,marginBottom:rows[i].breakHeight}} onClick={()=>{if(selectedId.current){exit();return;}create({day:column+1,start:i+1,end:i+1,specificDate:key});}}><span>+</span></button>)}
+    {positioned.map(({course:current,lane,lanes})=>{const course=courseById.get(current.id)!,cardHeight=rows.slice(current.start-1,current.end).reduce((sum,row)=>sum+row.height,0)-rows[current.end-1].breakHeight+3*(current.end-current.start),editing=interactive&&selectedCourseId===course.id;
      return <div key={course.id} data-course-id={course.id} data-focus-kind="course" data-focus-date={key} data-focus-section={current.start} className={`grid-course ${course.color} ${course.temporary?'temporary':''} ${editing?'layout-selected':''} ${gesture?.course.id===course.id?'resizing':''}`} style={{gridColumn:column+2,gridRow:`${current.start+1} / ${Math.min(current.end,schedule.periods.length)+2}`,marginBottom:rows[current.end-1].breakHeight,marginLeft:lanes>1?`${lane/lanes*100}%`:undefined,marginRight:lanes>1?`${(lanes-lane-1)/lanes*100}%`:undefined}}>
       <button className="grid-course-content" style={{touchAction:editing?'none':'pan-y'}} onPointerDown={e=>pressCourse(e,course,key)} onContextMenu={e=>{e.preventDefault();ignoreClick.current=true;if(selectedId.current!==course.id)enter(course,key);}} onKeyDown={e=>{if(e.key==='F2'){e.preventDefault();enter(course,key);}}} onClick={e=>{if(ignoreClick.current&&e.detail!==0)return;exit();view(course,key);}} title={`${course.name} · ${course.room}；点击查看，长按调整布局`}><strong style={{WebkitLineClamp:cardHeight<100?2:cardHeight<180?3:5}}>{course.name}</strong><span className="grid-course-room" style={{WebkitLineClamp:cardHeight<90?1:2}}>{course.room||'教室待填写'}</span>{course.teacher&&cardHeight>=135&&<small>{course.teacher}</small>}{cardHeight>=180&&<small>{course.temporary?'临时':`${current.start}–${current.end}节`}</small>}</button>
       {!editing&&<button className="layout-entry" aria-label={`${course.name}调整布局`} title="调整布局" onClick={e=>{e.stopPropagation();enter(course,key);}}>调整</button>}

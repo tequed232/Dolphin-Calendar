@@ -310,10 +310,14 @@ class MainActivity : Activity() {
     }
     inner class Bridge {
         @JavascriptInterface fun postMessage(raw: String) {
-            if(raw.length > 3_000_000) return
+            if(raw.length > 3_000_000) { runOnUiThread { if(!isDestroyed) message("数据过大，本次操作未执行，请缩小课表后重试") }; return }
+            // JavascriptInterface invokes this on the bridge thread; keep parsing off the UI thread.
+            val data = try { JSONObject(raw) } catch(error: Exception) {
+                runOnUiThread { if(!isDestroyed) message("操作未完成：${error.localizedMessage}") }; return
+            }
             runOnUiThread {
+                if(isDestroyed || isFinishing) return@runOnUiThread
                 try {
-                    val data = JSONObject(raw)
                     when(data.getString("type")) {
                         "ready" -> { pageReady = true; injectInsets(); updateNativeNavigation(true); theme(); handleIntent(intent); updatesStatus(); AppUpdates.check(this@MainActivity) { updatesStatus() } }
                         "navigationState" -> navigationState(data)
@@ -385,8 +389,16 @@ class MainActivity : Activity() {
             captureUri = null
         }
         if(requestCode == 101) {
-            if(resultCode == RESULT_OK && data?.data != null) try { contentResolver.openOutputStream(data.data!!)?.use { it.write((exportText ?: "").toByteArray()) }; message("课表已导出") } catch(e: Exception) { message("导出失败：${e.localizedMessage}") }
+            val text = exportText
             exportText = null
+            if(resultCode == RESULT_OK && data?.data != null && text != null) {
+                val destination = data.data!!
+                message("正在导出课表…")
+                Thread {
+                    val result = runCatching { DocumentExport.write(text) { contentResolver.openOutputStream(destination, "wt") } }
+                    runOnUiThread { if(!isFinishing && !isDestroyed) message(result.fold({ "课表已导出" }, { "导出失败：${it.localizedMessage}" })) }
+                }.start()
+            }
         }
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, results: IntArray) {

@@ -1,21 +1,16 @@
 import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {addDays,dateKey,parseDate} from '../lib/model';
+import {dateKey,parseDate} from '../lib/model';
 import {haptic} from '../lib/native';
 import type {HolidayMark} from '../lib/holidays';
+import {dateStripWindow,visibleDate} from './dateStripWindow';
 
 const WINDOW=181,EDGE=30,SHIFT=60;
 const isWeekend=(date:Date)=>date.getDay()===0||date.getDay()===6;
-function visibleDate(date:Date,offset:number,showWeekend:boolean){
-  if(showWeekend)return addDays(date,offset);
-  let result=new Date(date),remaining=Math.abs(offset),direction=Math.sign(offset);
-  while(remaining){result=addDays(result,direction);if(!isWeekend(result))remaining--;}
-  return result;
-}
 export function InfiniteDateStrip({selected,showWeekend,onSelect,holidayFor,orientation='horizontal'}:{selected:string;showWeekend:boolean;onSelect:(date:string)=>void;holidayFor?:(date:string)=>HolidayMark|undefined;orientation?:'horizontal'|'vertical'}){
   const viewport=useRef<HTMLDivElement>(null),rebase=useRef<{left:number;steps:number}|null>(null),rebasing=useRef(false),touching=useRef(false),idle=useRef<ReturnType<typeof setTimeout>|undefined>(undefined),firstPaint=useRef(true),jumpToSelection=useRef(false);
   const displayWeekend=showWeekend||isWeekend(parseDate(selected));
   const [start,setStart]=useState(()=>visibleDate(parseDate(selected),-90,displayWeekend));
-  const dates=useMemo(()=>Array.from({length:WINDOW},(_,index)=>visibleDate(start,index,displayWeekend)),[start,displayWeekend]);
+  const dates=useMemo(()=>dateStripWindow(start,WINDOW,displayWeekend),[start,displayWeekend]);
   const vertical=orientation==='vertical',previousOrientation=useRef(orientation);
   const position=(node:HTMLDivElement)=>vertical?node.scrollTop:node.scrollLeft,size=(node:HTMLDivElement)=>vertical?node.clientHeight:node.clientWidth;
   const setPosition=(node:HTMLDivElement,value:number)=>{if(vertical)node.scrollTop=value;else node.scrollLeft=value;};

@@ -1,3 +1,3 @@
-export const APP_VERSION = '1.4.9';
+export const APP_VERSION = '1.4.10';
 export const APP_NAME = 'Dolphin Calendar';
 export const GITHUB_PROFILE_URL = 'https://github.com/tequed232/';

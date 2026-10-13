@@ -4,7 +4,7 @@ import {InfiniteDateStrip} from '../components/InfiniteDateStrip';
 import {CalendarPicker} from '../components/CalendarPicker';
 import {useApp} from '../state/AppState';
 import type {HomeView} from '../state/useHomeFocus';
-import {coursePeriod,courseDates,compactWeeks,addDays,coursesOn,dateKey,parseDate,weekOf,DEFAULT_PERIODS,type Course,type Schedule} from '../lib/model';
+import {coursePeriod,compactWeeks,addDays,coursesOn,dateKey,parseDate,weekOf,DEFAULT_PERIODS,type Course} from '../lib/model';
 import {Icon} from '../components/Icon';
 import {haptic} from '../lib/native';
 import {holidayLookup} from '../lib/holidays';
@@ -13,13 +13,7 @@ import '../theme/updates.css';
 import {TimetableGrid} from '../components/TimetableGrid';
 import {DayTimetable} from '../components/DayTimetable';
 import '../theme/timetable.css';
-function courseDateSuggestions(schedule:Schedule,selected:string){
-  let first:string|undefined,next:string|undefined;
-  for(const course of schedule.courses.filter(c=>c.start>=1&&c.end<=schedule.periods.length))for(const key of courseDates(course,schedule)){
-    if(!first||key<first)first=key;if(key>selected&&(!next||key<next))next=key;
-  }
-  return {first,next};
-}
+import {courseDateIndex,courseDateSuggestions} from '../components/homePresentation';
 export function Home({openCourse,openImport,addCourse,navigate,visible,openUpdates,quickAdd,manage,view,mode,overlayOpen=false,onLayoutEditingChange}:{openCourse:(c:Course,el?:HTMLElement)=>void;openImport:()=>void;addCourse?:()=>void;navigate:(c:Course)=>void;visible:boolean;openUpdates?:()=>void;quickAdd?:(seed:Partial<Course>)=>void;manage:()=>void;view:HomeView;mode:'list'|'grid';overlayOpen?:boolean;onLayoutEditingChange:(editing:boolean)=>void}){
   const {data,ready,appUpdates,update}=useApp(),{schedule,settings}=data;
   const selected=view.focus.date,setSelected=view.selectDate;
@@ -28,16 +22,17 @@ export function Home({openCourse,openImport,addCourse,navigate,visible,openUpdat
   const [calendarOpen,setCalendarOpen]=useState(false),[verticalDates,setVerticalDates]=useState(()=>matchMedia('(orientation:landscape) and (min-width:480px)').matches);
   const [actionsHost,setActionsHost]=useState<HTMLElement|null>(null),[layoutStatusHost,setLayoutStatusHost]=useState<HTMLDivElement|null>(null);
   const listTable=useRef<HTMLDivElement>(null);
-  const date=parseDate(selected),courses=coursesOn(schedule,date),week=weekOf(date,schedule.term.startDate);
-  const showDayPeriods=!!schedule.courses.length||schedule.periods.length!==DEFAULT_PERIODS.length||schedule.periods.some((period,i)=>period.start!==DEFAULT_PERIODS[i]?.start||period.end!==DEFAULT_PERIODS[i]?.end||period.label||period.breakAfter);
-  const suggestions=useMemo(()=>courseDateSuggestions(schedule,selected),[schedule,selected]);
+  const date=useMemo(()=>parseDate(selected),[selected]),courses=useMemo(()=>coursesOn(schedule,date),[schedule,date]),week=weekOf(date,schedule.term.startDate);
+  const showDayPeriods=useMemo(()=>!!schedule.courses.length||schedule.periods.length!==DEFAULT_PERIODS.length||schedule.periods.some((period,i)=>period.start!==DEFAULT_PERIODS[i]?.start||period.end!==DEFAULT_PERIODS[i]?.end||period.label||period.breakAfter),[schedule.courses.length,schedule.periods]);
+  const courseDates=useMemo(()=>mode==='list'?courseDateIndex(schedule):[],[schedule,mode]);
+  const suggestions=useMemo(()=>courseDateSuggestions(courseDates,selected),[courseDates,selected]);
   const day=(date.getDay()+6)%7;
   const lines=settings.lines.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
   const dayNumber=Math.floor(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000);
   const greetingLine=lines.length?lines[((dayNumber%lines.length)+lines.length)%lines.length]:'留一点从容，给每一天。';
-  const activeIds=new Set(courses.map(course=>course.id));
+  const activeIds=useMemo(()=>new Set(courses.map(course=>course.id)),[courses]);
   // 其他周课程单独展示，整学年课表可查看，也不会被当成所选日期的安排。
-  const otherWeekCourses=schedule.courses.filter(course=>course.start>=1&&course.end<=schedule.periods.length&&!course.specificDate&&course.day===day+1&&!activeIds.has(course.id)).sort((a,b)=>a.start-b.start||a.weeks[0]-b.weeks[0]);
+  const otherWeekCourses=useMemo(()=>schedule.courses.filter(course=>course.start>=1&&course.end<=schedule.periods.length&&!course.specificDate&&course.day===day+1&&!activeIds.has(course.id)).sort((a,b)=>a.start-b.start||a.weeks[0]-b.weeks[0]),[schedule,day,activeIds]);
   const current=courses.find(c=>{const end=new Date(`${selected}T${schedule.periods[c.end-1]?.end}:00`).getTime();return selected>=dateKey(new Date(now))&&end>now;});
   const isToday=selected===dateKey(new Date(now));
   const isCurrentWeek=week===weekOf(new Date(now),schedule.term.startDate);
@@ -46,7 +41,7 @@ export function Home({openCourse,openImport,addCourse,navigate,visible,openUpdat
   const emptyReason=week<1?`所选日期早于课表第 1 周，开学日期为 ${schedule.term.startDate.replaceAll('-','/')}。`:week>schedule.term.weeks?`所选日期已超出课表的 ${schedule.term.weeks} 周范围。`:otherWeekCourses.length?`当前是第 ${week} 周；同星期的其他周课程可在下方展开查看。`:`课表在第 ${week} 周的星期${'一二三四五六日'[day]}没有安排课程。`;
   const suggestedDate=suggestions.next??suggestions.first;
   const suggestedLabel=suggestions.next?`查看 ${parseDate(suggestions.next).getFullYear()!==date.getFullYear()?parseDate(suggestions.next).getFullYear()+' 年 ':''}${parseDate(suggestions.next).getMonth()+1} 月 ${parseDate(suggestions.next).getDate()} 日课程`:'查看本学期有课日期';
-  useEffect(()=>{const refresh=()=>setNow(Date.now()),resume=()=>{if(!document.hidden)refresh();};const id=setInterval(refresh,30000);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',resume);return()=>{clearInterval(id);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',resume);};},[]);
+  useEffect(()=>{if(!visible)return;const refresh=()=>{if(!document.hidden)setNow(Date.now());};refresh();const id=setInterval(refresh,30000);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);return()=>{clearInterval(id);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};},[visible]);
   useEffect(()=>{setActionsHost(document.getElementById('home-actions-portal'));},[]);
   useEffect(()=>{const query=matchMedia('(orientation:landscape) and (min-width:480px)'),refresh=()=>setVerticalDates(query.matches);query.addEventListener('change',refresh);return()=>query.removeEventListener('change',refresh);},[]);
 

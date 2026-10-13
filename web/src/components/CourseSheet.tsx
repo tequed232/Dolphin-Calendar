@@ -11,6 +11,7 @@ import {UnsavedChanges} from './UnsavedChanges';
 export function CourseSheet({course,origin,onClose,navigate,editCourse}:{course:Course;origin?:DOMRect;onClose:()=>void;navigate:(c:Course)=>void;editCourse:(c:Course)=>void}){
   const {data,update,toast}=useApp(),book=data.books[course.name];
   const sheet=useRef<HTMLDivElement>(null),drag=useRef({y:0,active:false}),lock=useRef(false),closeDetailAfter=useRef(false),baseline=useRef<Book|null>(null),titleInput=useRef<HTMLInputElement>(null),id=useId();
+  const previousFocus=useRef(document.activeElement instanceof HTMLElement?document.activeElement:null);
   const [full,setFull]=useState(false),[expandedDates,setExpandedDates]=useState(false),[draft,setDraft]=useState<Book|null>(null),[busy,setBusy]=useState<'cover'|'save'|'remove'|null>(null),[error,setError]=useState(''),[titleError,setTitleError]=useState(''),[confirmRemove,setConfirmRemove]=useState(false);
   const dates=courseDates(course,data.schedule),periods=data.schedule.periods;
   const dirty=!!draft&&JSON.stringify(draft)!==JSON.stringify(baseline.current);
@@ -34,7 +35,7 @@ export function CourseSheet({course,origin,onClose,navigate,editCourse}:{course:
       }
     };
     window.addEventListener('dolphin-close-course-detail',closeEvent);document.addEventListener('keydown',key);
-    return()=>{window.removeEventListener('dolphin-close-course-detail',closeEvent);document.removeEventListener('keydown',key);document.documentElement.classList.remove('gesturing');};
+    return()=>{window.removeEventListener('dolphin-close-course-detail',closeEvent);document.removeEventListener('keydown',key);document.documentElement.classList.remove('gesturing');const trigger=previousFocus.current;if(trigger?.isConnected&&!trigger.closest('[inert]'))trigger.focus({preventScroll:true});};
   },[]);
   function newDraft():Book{const builtin=BOOK_LIBRARY[course.name];return book?{...book}:{title:builtin?.title??course.name,publisher:builtin?.publisher??'',edition:'',text:'',source:builtin?'builtin':'manual'};}
   function manual(){if(lock.current)return;const next=newDraft();baseline.current=next;closeDetailAfter.current=false;setDraft(next);setError('');setTitleError('');}

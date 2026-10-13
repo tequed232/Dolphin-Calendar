@@ -32,10 +32,18 @@ $sourceZip = Join-Path $destination "dolphin-calendar-$version-sourcecode.zip"
 & git archive --format=zip "--output=$sourceZip" HEAD
 if ($LASTEXITCODE -ne 0) { throw '生成已提交源码压缩包失败' }
 Copy-Item -LiteralPath 'docs\STATUS.md' -Destination (Join-Path $destination '验证与使用说明.md') -Force
-Copy-Item -LiteralPath "docs\UI_$version.md" -Destination (Join-Path $destination '界面与升级说明.md') -Force
+$reviewDocument = if (Test-Path -LiteralPath "docs\REVIEW_$version.md") { "docs\REVIEW_$version.md" } else { "docs\UI_$version.md" }
+Copy-Item -LiteralPath $reviewDocument -Destination (Join-Path $destination '界面与升级说明.md') -Force
 Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $destination 'README.md') -Force
 $evidenceBase = Join-Path $projectRoot 'build\evidence'
 $evidenceNames = @(
+    "$version-ui-interaction-review.json", "$version-keyboard-choice.png", "$version-performance-results.json",
+    "$version-list-card-scroll-results.json", "$version-temporary-date-results.json", "$version-reminder-gate-results.json",
+    "$version-baseline-results.json", "$version-baseline-before-courses.png", "$version-baseline-before-preferences.png",
+    'state-recovery-review.json', 'update-races-results.json', 'performance-baseline.json', 'performance-improved.json',
+    'reminder-baseline.json', 'reminder-improved.json', 'reminder-junit-results.txt', "$version-reminder-review.json",
+    "$version-temporary-date-before.json", "$version-temporary-date-after.png", "$version-final-resource-sync.log",
+    "$version-list-card-scroll-baseline.log", "$version-list-card-scroll-fixed.log", "$version-reminder-validation-tests.json",
     "$version-import-guide-results.json", "$version-import-guide-portrait.png", "$version-import-guide-video.png",
     "$version-import-guide-public-media.json", "$version-apk-tutorial-isolation.json", "$version-android-build.log", "$version-resource-staging.json",
     'import-guide-media.json', 'import-guide-static-review.json',

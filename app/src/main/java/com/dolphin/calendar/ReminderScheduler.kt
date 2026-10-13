@@ -45,7 +45,7 @@ object ReminderScheduler {
     }
     fun schedule(context: Context) {
         val alarm = context.getSystemService(AlarmManager::class.java)
-        val identity = Intent(context, ReminderReceiver::class.java).setAction("com.dolphin.calendar.REMIND")
+        val identity = Intent(context, ReminderReceiver::class.java).setAction(ReminderValidation.ACTION)
         val previous = PendingIntent.getBroadcast(context, 100, identity, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
         previous?.let { alarm.cancel(it); it.cancel() }
         val settings = settings(context)
@@ -74,16 +74,28 @@ class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if(intent.action == "com.dolphin.calendar.STOP_JOURNEY" || intent.action == "com.dolphin.calendar.DISMISS_JOURNEY") { Notifications.expireJourney(context,intent.getStringExtra("journeyToken") ?: ""); return }
         if(intent.action == Notifications.journeyTimeoutAction()) { Notifications.expireJourney(context,intent.getStringExtra("journeyToken") ?: ""); return }
+        if(intent.action != ReminderValidation.ACTION) return
         val pending=goAsync();val app=context.applicationContext;val raw=intent.getStringExtra("events")
         Thread {
             try {
-                val events=runCatching { JSONArray(raw ?: "[]") }.getOrDefault(JSONArray())
-                for(i in 0 until events.length()){
-                    val e=events.getJSONObject(i)
-                    Notifications.course(app,e.getJSONObject("course"),e.getLong("start"),e.getLong("end"))
+                val settings=runCatching { ReminderScheduler.settings(app) }.getOrNull()
+                if(settings != null && settings.optBoolean("notificationsEnabled",true) && settings.optBoolean("reminders")) {
+                    val events=runCatching { JSONArray(raw ?: "[]") }.getOrDefault(JSONArray())
+                    val queued=(0 until events.length()).mapNotNull { index -> runCatching {
+                        val event=events.getJSONObject(index)
+                        val id=event.getJSONObject("course").get("id") as? String ?: return@runCatching null
+                        // Strings, fractions and missing times are not valid scheduled-alarm payloads.
+                        val start=event.get("start") as? Long ?: (event.get("start") as? Int)?.toLong() ?: return@runCatching null
+                        val end=event.get("end") as? Long ?: (event.get("end") as? Int)?.toLong() ?: return@runCatching null
+                        ReminderKey(id,start,end)
+                    }.getOrNull() }
+                    val current=runCatching { ReminderScheduler.occurrences(app) }.getOrDefault(emptyList()).map { occurrence ->
+                        ReminderCandidate(ReminderKey(occurrence.course.opt("id") as? String ?: "",occurrence.start,occurrence.end),occurrence)
+                    }
+                    for(event in ReminderValidation.deliveries(intent.action,true,true,settings.optInt("advance",10),System.currentTimeMillis(),queued,current))
+                        runCatching { Notifications.course(app,event.course,event.start,event.end) }
                 }
-                ReminderScheduler.schedule(app)
-            } finally { pending.finish() }
+            } finally { try { runCatching { ReminderScheduler.schedule(app) } } finally { pending.finish() } }
         }.start()
     }
 }
