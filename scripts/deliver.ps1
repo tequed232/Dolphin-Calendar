@@ -37,6 +37,8 @@ Copy-Item -LiteralPath $reviewDocument -Destination (Join-Path $destination '界
 Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $destination 'README.md') -Force
 $evidenceBase = Join-Path $projectRoot 'build\evidence'
 $evidenceNames = @(
+    "$version-grid-scroll-date-results.json", "$version-grid-scroll-date-before.json", "$version-grid-scroll-date-before.png",
+    "$version-native-grid-scroll-date-results.json", "$version-native-grid-restoration.json",
     "$version-ui-interaction-review.json", "$version-keyboard-choice.png", "$version-performance-results.json",
     "$version-list-card-scroll-results.json", "$version-temporary-date-results.json", "$version-reminder-gate-results.json",
     "$version-baseline-results.json", "$version-baseline-before-courses.png", "$version-baseline-before-preferences.png",

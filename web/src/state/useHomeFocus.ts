@@ -28,11 +28,13 @@ export function useHomeFocus({schedule,mode,ready,overlayOpen,layoutEditing}:Opt
   const area=readingArea();if(!area)return current.current;
   const currentRoot=context.current.mode?roots[context.current.mode].current:null;if(!currentRoot)return current.current;
   const sticky=currentRoot.querySelector<HTMLElement>('.grid-period')?.getBoundingClientRect(),visibleLeft=Math.max(area.left,sticky?.right??area.left);
-  const candidates=[...currentRoot.querySelectorAll<HTMLElement>('[data-focus-kind="course"]')].map(el=>({el,rect:el.getBoundingClientRect()})).filter(({el,rect})=>rect.bottom>area.top&&rect.top<area.bottom&&rect.right>visibleLeft&&rect.left<area.right&&(horizontal||current.current.source!=='date'||el.dataset.focusDate===current.current.date));
+  // Reading another section vertically must not select a different weekday.
+  // Only a horizontal pan or an explicit date/course selection may change it.
+  const candidates=[...currentRoot.querySelectorAll<HTMLElement>('[data-focus-kind="course"]')].map(el=>({el,rect:el.getBoundingClientRect()})).filter(({el,rect})=>rect.bottom>area.top&&rect.top<area.bottom&&rect.right>visibleLeft&&rect.left<area.right&&(horizontal||el.dataset.focusDate===current.current.date));
   const explicit=current.current.source==='selection'?candidates.find(({el})=>el.dataset.courseId===current.current.courseId&&el.dataset.focusDate===current.current.date):undefined;
   const score=({el,rect}:{el:HTMLElement;rect:DOMRect})=>Math.abs(rect.top+Math.min(rect.height/2,80)-area.anchor)+(el.dataset.focusDate===current.current.date?0:16);
   const main=explicit??candidates.sort((a,b)=>score(a)-score(b))[0];
-  if(main){remember({date:main.el.dataset.focusDate!,sectionIndex:Number(main.el.dataset.focusSection),courseId:main.el.dataset.courseId,source:explicit?'selection':'viewport'});}
+  if(main){remember({date:main.el.dataset.focusDate!,sectionIndex:Number(main.el.dataset.focusSection),courseId:main.el.dataset.courseId,source:explicit?'selection':!horizontal&&current.current.source==='date'?'date':'viewport'});}
   else{
    const rows=[...currentRoot.querySelectorAll<HTMLElement>('[data-focus-kind="section"]')].map(el=>({el,rect:el.getBoundingClientRect()})).filter(({rect})=>rect.bottom>area.top&&rect.top<area.bottom);
    const row=rows.sort((a,b)=>Math.abs(a.rect.top+a.rect.height/2-area.anchor)-Math.abs(b.rect.top+b.rect.height/2-area.anchor))[0];
@@ -86,7 +88,11 @@ export function useHomeFocus({schedule,mode,ready,overlayOpen,layoutEditing}:Opt
    if(!restoring.current&&context.current.mode&&!context.current.overlayOpen){interacted.current=true;scheduleCapture();}
   };
   const horizontal=gridRoot.current?.querySelector<HTMLElement>('.week-grid-scroll');
-  const pan=()=>{if(context.current.mode==='grid'&&!restoring.current&&!context.current.overlayOpen){interacted.current=true;scheduleCapture(true);}};
+  let previousLeft=horizontal?.scrollLeft??0;
+  const pan=()=>{
+   const left=horizontal?.scrollLeft??0,changed=left!==previousLeft;previousLeft=left;
+   if(context.current.mode==='grid'&&!restoring.current&&!context.current.overlayOpen){interacted.current=true;scheduleCapture(changed);}
+  };
   horizontal?.addEventListener('scroll',pan,{passive:true});
   screens.forEach(screen=>screen.addEventListener('scroll',scroll,{passive:true}));return()=>{cancelCapture();cancelAnimationFrame(restoreFrame.current);screens.forEach(screen=>screen.removeEventListener('scroll',scroll));horizontal?.removeEventListener('scroll',pan);};
  },[]);

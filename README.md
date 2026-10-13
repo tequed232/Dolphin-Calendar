@@ -8,11 +8,15 @@
 
 Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 React 界面提供网页版和 Android 安装版：主页看课程，点击课程看教师、教室和教材，需要时再开启提醒、导航或系统日历。
 
-无需账号，没有自建业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。当前源码版本为 **1.4.10**，正式安装包见 [GitHub Releases](https://github.com/tequed232/Dolphin-Calendar/releases)。各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
+无需账号，没有自建业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。当前源码版本为 **1.4.11**，正式安装包见 [GitHub Releases](https://github.com/tequed232/Dolphin-Calendar/releases)。各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
 
 在线使用：[Dolphin Calendar 网页版](https://tequed232.github.io/Dolphin-Calendar/)。网页版发布运行 `npm run build:pages`，入口为 `build/pages/index.html`。该入口内置编译后的界面代码和样式，图片与离线缓存文件随整个目录发布，支持 `/Dolphin-Calendar/` 子路径。不要将开发用的 `web/index.html` 单独上传。发布工作流和 Pages 发布条件见 [发布说明](docs/PUBLISHING.md)。
 
 [功能](#功能概览) · [JSON 格式](#json-课表格式) · [本地开发](#本地开发) · [架构](#工程架构) · [验证](#验证与测试) · [许可](#许可证与美术资产)
+
+## 1.4.11 平铺滚动日期修复
+
+修复导入课表后，选择周一等日期、连续向上滑动却自动选中星期四的问题。上下滚动只更新当前日期的阅读课程或节次；实际横向平移、点选日期和点按其他日课程继续使用原导航规则。内层滚动事件没有水平位移时，不再被当作横向浏览。复现、回归、覆盖安装及交付证据见 [1.4.11 修复记录](docs/REVIEW_1.4.11.md)。
 
 ## 1.4.10 项目审查与修复
 

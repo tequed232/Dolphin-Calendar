@@ -160,7 +160,7 @@ const reviewedChanges={
  "web/src/screens/Background.tsx":"Four-item solid navigation preview",
  "web/src/screens/Home.tsx":"1.4.10 memoized course/date presentation and active-screen clock; existing data and navigation retained",
  "web/src/screens/Settings.tsx":"Retire obsolete Dock controls",
- "web/src/state/useHomeFocus.ts":"1.4.10 coalesce scroll focus sampling and cancel stale samples on explicit navigation",
+ "web/src/state/useHomeFocus.ts":"1.4.10 coalesce scroll sampling; 1.4.11 keep weekday during vertical reading and classify actual horizontal pans",
  "web/src/theme/app.css":"1.4.10 allow list scrolling from course cards; historical solid navigation and reserved content retained",
  "web/src/theme/background.css":"Solid navigation preview",
  "web/src/theme/calendar.css":"Sliding month/year presentation",
