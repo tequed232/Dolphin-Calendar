@@ -11,10 +11,12 @@ export function DayTimetable({root,schedule,courses,selected,showTimes,now,showT
  const rows=useMemo(()=>gridRows(schedule.periods),[schedule.periods]),positioned=useMemo(()=>layoutCourses(courses),[courses]),touch=useRef({id:null as number|null,x:0,y:0,multiple:false});
  // Chromium can keep a touch gesture latched to an overflowing card at its edge.
  // Allow native content scrolling inward; only hand an outward gesture to the list.
+ // scrollHeight/clientHeight are integers; scrollTop can retain fractional zoom pixels.
+ const edgeTolerance=2;
  const edgeTouch=useRef<{id:number;x:number;y:number;lastY:number;edge:'top'|'bottom';screen:HTMLElement;axis?:'x'|'y';forwarding?:boolean}|null>(null),skipClick=useRef(0);
  useLayoutEffect(()=>{
   const cards=Array.from(root.current?.querySelectorAll<HTMLElement>('.day-course')??[]);
-  const update=(card:HTMLElement)=>{const max=card.scrollHeight-card.clientHeight;card.style.touchAction=max<=1?'pan-y':card.scrollTop<=1?'pan-down pinch-zoom':card.scrollTop>=max-1?'pan-up pinch-zoom':'pan-y';};
+  const update=(card:HTMLElement)=>{const max=card.scrollHeight-card.clientHeight;card.style.touchAction=max<=edgeTolerance?'pan-y':card.scrollTop<=edgeTolerance?'pan-down pinch-zoom':card.scrollTop>=max-edgeTolerance?'pan-up pinch-zoom':'pan-y';};
   const listeners=cards.map(card=>{const changed=()=>update(card);card.addEventListener('scroll',changed,{passive:true});update(card);return {card,changed};});
   const observer=new ResizeObserver(()=>cards.forEach(update));cards.forEach(card=>observer.observe(card));
   return()=>{observer.disconnect();listeners.forEach(({card,changed})=>{card.removeEventListener('scroll',changed);card.style.removeProperty('touch-action');});edgeTouch.current=null;};
@@ -23,8 +25,8 @@ export function DayTimetable({root,schedule,courses,selected,showTimes,now,showT
   onPointerDown={event=>{
    edgeTouch.current=null;skipClick.current=0;if(event.pointerType!=='touch'||!event.isPrimary)return;
    const card=(event.target as HTMLElement).closest<HTMLElement>('.day-course'),screen=card?.closest<HTMLElement>('.screen');if(!card||!screen)return;
-   const max=card.scrollHeight-card.clientHeight;if(max<=1)return;
-   const edge=card.scrollTop<=1?'top':card.scrollTop>=max-1?'bottom':undefined;
+   const max=card.scrollHeight-card.clientHeight;if(max<=edgeTolerance)return;
+   const edge=card.scrollTop<=edgeTolerance?'top':card.scrollTop>=max-edgeTolerance?'bottom':undefined;
    if(edge)edgeTouch.current={id:event.pointerId,x:event.clientX,y:event.clientY,lastY:event.clientY,edge,screen};
   }}
   onPointerMove={event=>{

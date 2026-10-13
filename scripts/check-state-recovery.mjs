@@ -9,13 +9,17 @@ async function fixture(native,corrupt=false){
  page.on('pageerror',error=>errors.push(error.message));
  await page.route('**/src/main.tsx',route=>route.fulfill({contentType:'application/javascript',body:'export {};'}));
  await page.goto(base);
- await page.evaluate(async({native,cover,corrupt})=>{
+ // Read Vite's real import URLs outside the page's main-entry stub. Each optimized
+ // dependency can have its own query hash; swapping only the filename is invalid.
+ const [providerSource,mainSource]=await Promise.all([fetch(base+'/src/state/AppState.tsx').then(response=>response.text()),fetch(base+'/src/main.tsx').then(response=>response.text())]);
+ const reactURL=providerSource.match(/from "([^"]+\/react\.js[^"]*)"/)?.[1],reactDOMURL=mainSource.match(/from "([^"]+\/react-dom_client\.js[^"]*)"/)?.[1];
+ assert.ok(reactURL&&reactDOMURL,'Vite must provide both actual dependency import URLs');
+ await page.evaluate(async({native,cover,corrupt,reactURL,reactDOMURL})=>{
   window.__coverRenders=0;window.__commands=[];
   const ImageConstructor=window.Image;window.Image=class extends ImageConstructor{constructor(...args){super(...args);window.__coverRenders++;}};
   if(native)window.Dolphin={postMessage(raw){window.__commands.push(JSON.parse(raw));}};
-  const reactURL=(await (await fetch('/src/state/AppState.tsx')).text()).match(/from "([^"]+\/react\.js[^"]*)"/)[1];
   const [{initialData},{saveData},React,ReactDOM,{AppProvider,useApp}]=await Promise.all([
-   import('/src/lib/model.ts'),import('/src/lib/storage.ts'),import(reactURL),import(reactURL.replace('/react.js','/react-dom_client.js')),import('/src/state/AppState.tsx')
+   import('/src/lib/model.ts'),import('/src/lib/storage.ts'),import(reactURL),import(reactDOMURL),import('/src/state/AppState.tsx')
   ]);
   const {createElement}=React.default??React,{createRoot}=ReactDOM.default??ReactDOM;
   const data=initialData();data.onboarded=true;data.settings.autoUpdate=false;
@@ -24,7 +28,7 @@ async function fixture(native,corrupt=false){
   await saveData(data);
   function Probe(){const state=useApp();window.__update=state.update;window.__data=state.data;window.__ready=state.ready;window.__error=state.error;return createElement('span',null,state.error||String(state.ready));}
   createRoot(document.querySelector('#root')).render(createElement(AppProvider,null,createElement(Probe)));
- },{native,cover,corrupt});
+ },{native,cover,corrupt,reactURL,reactDOMURL});
  await page.waitForFunction(corrupt?()=>window.__error:()=>window.__ready);return {context,page};
 }
 async function stored(page){return page.evaluate(async()=>{const {loadData}=await import('/src/lib/storage.ts');return loadData();});}
