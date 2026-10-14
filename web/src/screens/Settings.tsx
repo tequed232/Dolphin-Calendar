@@ -20,6 +20,7 @@ export const SETTINGS_GROUPS:{title:string;route:Route;description:string;icon:I
   {title:'导航与学校',route:'navigation',description:'学校 · 地图',icon:'pin'},
   {title:'应用更新',route:'updates',description:'正式 Release · 下载方式',icon:'download'},
   {title:'数据与备份',route:'data',description:'本机存储 · 数据说明',icon:'shield'},
+  {title:'插件管理',route:'plugins',description:'自定义课表 · 主题 · 导入转换',icon:'spark'},
   {title:'关于',route:'about',description:'版本 · 开源协议 · 使用说明',icon:'info'}
 ];
 export const ROUTE_TITLES:Record<Route,string>={...Object.fromEntries(SETTINGS_GROUPS.map(g=>[g.route,g.title])),editor:'课表管理','home-settings':'主页显示',import:'导入课表',books:'我的教材',calendar:'系统日历',interface:'课表转换说明',background:'背景',holidays:'节假日标记','safe-area':'屏幕安全区',times:'上课时间','schedule-settings':'课表设置'} as Record<Route,string>;

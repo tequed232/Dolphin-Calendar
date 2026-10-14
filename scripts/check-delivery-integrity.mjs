@@ -133,6 +133,8 @@ const expected={
 // Scope allowance, not a new hash baseline. Unlisted business files remain frozen.
 // Mixed UI/bridge files require review plus behavior checks.
 const reviewedChanges={
+ "web/src/nav/useNavigation.ts":"1.5.1 add plugins secondary route type only; existing navigation implementation unchanged",
+ "app/src/main/java/com/dolphin/calendar/Notifications.kt":"1.5.1 remove repeated expanded locations, timers and numeric stages; preserve actions and collapsed building",
  "web/src/components/CourseEditor.tsx":"1.4.10 synchronize the temporary date and displayed weekday while editing",
  "app/src/main/java/com/dolphin/calendar/ReminderScheduler.kt":"1.4.10 validate queued reminders against current settings, occurrences and time before delivery; isolate damaged elements",
  "web/src/lib/storage.ts":"1.4.10 recover failed/closed IndexedDB connections and reject damaged snapshots without overwriting data",
@@ -143,7 +145,7 @@ const reviewedChanges={
  "web/src/components/ScheduleSettings.tsx":"1.4.10 lock fields during save to prevent silently discarded edits",
  "web/src/lib/import.ts":"1.4.10 exact mixed-parity/empty-week bug fixes projected out before original algorithm hash check",
  "web/src/lib/fileImport.ts":"1.4.9 unified template data only; parser remainder separately frozen",
- "web/src/screens/Import.tsx":"1.4.9 unified template and external tutorial presentation; original preview/commit path retained",
+ "web/src/screens/Import.tsx":"1.4.9 unified template; 1.5.1 accept plugin JSON through original preview/commit flow without parser changes",
  "web/src/components/InfiniteDateStrip.tsx":"1.4.10 incrementally generate the existing horizontal/vertical date window without changing its dates",
  "web/src/components/TimetableGrid.tsx":"1.4.10 memoize overlap presentation and skip unchanged pointer targets; original edit/save behavior retained",
  "web/src/theme/tokens.css":"1.4.8 shared light/dark/system course surface and text tokens",

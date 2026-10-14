@@ -1,0 +1,16 @@
+.plugin-controls{padding:0;margin:0;border:0;min-width:0}
+.plugin-controls:disabled{opacity:.68}
+.plugin-manager h2{font-size:1.15rem}.plugin-manager h3{overflow-wrap:anywhere}
+.plugin-source{margin-top:16px}.plugin-source summary,.plugin-installed summary{color:var(--accent);cursor:pointer;padding:8px 0}
+.plugin-source textarea{width:100%;min-height:170px;box-sizing:border-box;resize:vertical;font-family:ui-monospace,monospace;font-size:.85rem}
+.plugin-manager .button-row{flex-wrap:wrap;gap:10px}.plugin-manager .button-row button{flex:1 1 145px;white-space:normal;min-width:0}
+.plugin-manager button:has(svg){display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.plugin-card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.plugin-card-heading h3{margin:0}.plugin-card-heading .version-tag{flex:none}
+.plugin-badges{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.plugin-badges span{font-size:.75rem;border-radius:8px;padding:4px 8px;background:var(--accent-soft);color:var(--accent)}
+.plugin-permissions{list-style:none;padding:0;margin:10px 0}.plugin-permissions li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;padding:9px 0;border-bottom:1px solid var(--line)}.plugin-permissions code{color:var(--muted);overflow-wrap:anywhere;font-size:.8rem}
+.plugin-error{padding:12px 14px;border:1px solid var(--danger);border-radius:12px;color:var(--danger);overflow-wrap:anywhere}.plugin-error p{margin:0 0 8px}.plugin-notice{padding:12px 14px;background:var(--accent-soft);border-radius:12px;color:var(--accent)}
+.plugin-manager .plugin-remove{margin-top:8px;color:var(--danger)}.plugin-documentation{margin:12px 0;border-radius:14px;background:var(--surface);padding:16px}
+.plugin-frame-container{min-width:0;margin-top:16px}.plugin-frame-container iframe{display:block;width:100%;min-height:300px;height:550px;max-height:70dvh;border:1px solid var(--line);border-radius:18px;background:var(--canvas)}
+.plugin-tool-view{min-width:0;padding:16px;margin:18px 0;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+.plugin-view-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}.plugin-view-toolbar>span{font-weight:650;overflow-wrap:anywhere;min-width:0}.plugin-view-toolbar>button{flex:none}
+@media(max-width:360px){.plugin-card-heading{align-items:flex-start;flex-direction:column}.plugin-permissions li{display:block}.plugin-permissions code{display:block;margin-top:4px}}

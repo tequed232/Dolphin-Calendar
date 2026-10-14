@@ -1,4 +1,4 @@
-import {useRef,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {useApp} from '../state/AppState';
 import {JSON_PROMPT,parseImport} from '../lib/import';
 import {copyText,isNative,native} from '../lib/native';
@@ -12,7 +12,7 @@ import {PageLeaveGuard} from '../components/PageLeaveGuard';
 import {ImportSteps} from '../components/ImportSteps';
 import {exportText} from '../lib/export';
 import {coursesConflict,periodRest} from '../lib/scheduleTime';
-export function Import({done}:{done:()=>void}){
+export function Import({done,initialText,onInitialTextConsumed}:{done:()=>void;initialText?:string;onInitialTextConsumed?:()=>void}){
   const {data,update,toast}=useApp(),[text,setText]=useState(''),[error,setError]=useState(''),[preview,setPreview]=useState<Schedule|null>(null),[prompt,setPrompt]=useState(''),[busy,setBusy]=useState(false);
   const [file,setFile]=useState<File|null>(null),[format,setFormat]=useState('json'),[stage,setStage]=useState(0),[formatHelp,setFormatHelp]=useState(false);
 
@@ -21,6 +21,8 @@ export function Import({done}:{done:()=>void}){
   function returnToFile(){if(saving.current)return;setPreview(null);setDateOpen(false);setStage(file?2:0);}
   function chooseAgain(){setFile(null);setStage(0);requestAnimationFrame(()=>fileInput.current?.click());}
   function parse(value:string){try{setError('');setStage(2);setFormat('json');setFile(null);setPreview(parseJSONPreview(value,data.schedule).schedule);setStage(3);}catch(e){setError(`请提供有效的 JSON 课表：${(e as Error).message}`);}}
+  const initialConsumed=useRef(false);
+  useEffect(()=>{if(initialText===undefined||initialConsumed.current)return;initialConsumed.current=true;setText(initialText);parse(initialText);onInitialTextConsumed?.();},[initialText]);
   function read(file:File|undefined){if(file){setFile(file);setStage(1);}}
   async function commit(){if(!preview||saving.current)return;saving.current=true;setBusy(true);setStage(4);try{const validated=parseImport(JSON.stringify(preview),'json',data.schedule,{allowEmpty:true,preserveCourseIds:true});await update(s=>({...s,schedule:validated,onboarded:true}));committed.current=true;toast(`已导入 ${validated.courses.length} 门课程，主页已同步`);setPreview(null);setFile(null);requestAnimationFrame(done);}catch(e){setStage(3);setError(`保存未完成：${(e as Error).message}`);}finally{saving.current=false;setBusy(false);}}
   return <>

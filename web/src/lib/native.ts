@@ -9,6 +9,7 @@ declare global {
     dolphinInsets?: (top:number,bottom:number,keyboard?:number,height?:number)=>void;
     dolphinMetrics?: {backCallbacks:number};
     dolphinSystemDark?: boolean;
+    dolphinPluginSandboxSupported?: boolean;
   }
 }
 export const isNative = () => !!window.Dolphin;

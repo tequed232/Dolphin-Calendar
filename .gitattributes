@@ -5,3 +5,4 @@ gradlew text eol=lf
 *.bat text eol=crlf
 *.png binary
 *.jar binary
+web/src/assets/icons/LICENSE text eol=lf

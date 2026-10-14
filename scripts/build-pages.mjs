@@ -16,6 +16,8 @@ await cp('web/dist',output,{recursive:true});
 await cp('docs/import-guide',path.join(output,'import-guide'),{recursive:true});
 const guide=spawnSync(process.execPath,['--import','tsx','scripts/build-import-guide.mjs'],{stdio:'inherit'});
 if(guide.status!==0)process.exit(guide.status??1);
+const plugin=spawnSync(process.execPath,['--import','tsx','scripts/build-plugin-example.mjs'],{stdio:'inherit'});
+if(plugin.status!==0)process.exit(plugin.status??1);
 // Pages opens index.html: inline the compiled application and styles into that entry.
 // Images remain alongside it as local assets, also used by the offline download.
 await writeFile(path.join(output,'index.html'),await readFile('web/dist/Dolphin-Calendar-offline.html'));

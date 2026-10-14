@@ -7,9 +7,11 @@ import './theme/holiday.css';
 import './theme/page-structure.css';
 import './theme/experience.css';
 import {AppProvider} from './state/AppState';
+import {PluginProvider} from './state/PluginState';
+import './theme/plugins.css';
 import {App} from './App';
 import './theme/responsive-navigation.css';
-createRoot(document.getElementById('root')!).render(<AppProvider><App/></AppProvider>);
+createRoot(document.getElementById('root')!).render(<AppProvider><PluginProvider><App/></PluginProvider></AppProvider>);
 // APK 已打包全部资源，不注册网页离线缓存，避免覆盖安装后旧缓存截住新构建。
 if(window.Dolphin) navigator.serviceWorker?.getRegistrations().then(registrations=>{for(const registration of registrations)void registration.unregister();}).catch(()=>{});
 else if(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')navigator.serviceWorker?.register('./sw.js',{updateViaCache:'none'}).catch(()=>{});

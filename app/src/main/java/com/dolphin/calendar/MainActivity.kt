@@ -32,9 +32,13 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import org.json.JSONObject
 import java.io.File
 import java.time.LocalDate
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 
 class MainActivity : Activity() {
     private lateinit var web: EdgeWebView
@@ -64,6 +68,8 @@ class MainActivity : Activity() {
     private var pendingTestNotification = false
     private var pendingJourney: JSONObject? = null
     private var stopObservingUpdates: (() -> Unit)? = null
+    private var pluginSandboxSupported = false
+    private val bridgeExecutor = Executors.newSingleThreadExecutor { task -> Thread(task, "DolphinBridge") }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,7 +108,23 @@ class MainActivity : Activity() {
             }
             override fun onPageFinished(view: WebView?, url: String?) { injectInsets() }
         }
-        web.addJavascriptInterface(Bridge(), "Dolphin")
+        val bridge = Bridge()
+        pluginSandboxSupported = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
+        if(pluginSandboxSupported) {
+            // Origin-scoped and main-frame-only: sandboxed plugin frames never receive a native bridge.
+            WebViewCompat.addWebMessageListener(web, "Dolphin", setOf("https://appassets.androidplatform.net")) { _, message, origin, isMainFrame, _ ->
+                if(isMainFrame && origin.toString() == "https://appassets.androidplatform.net" && !isDestroyed && !isFinishing) {
+                    val raw = message.data ?: return@addWebMessageListener
+                    // Preserve sync/history ordering while parsing off the UI thread.
+                    // Bridge owns the size check and its existing user-visible feedback.
+                    try { bridgeExecutor.execute { bridge.postMessage(raw) } }
+                    catch(_: RejectedExecutionException) { /* Activity teardown has already stopped this bridge. */ }
+                }
+            }
+        } else {
+            // Keep built-in features available on legacy WebViews; Web must refuse to run plugins.
+            web.addJavascriptInterface(bridge, "Dolphin")
+        }
         web.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(view: WebView?, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
                 fileCallback?.onReceiveValue(null); fileCallback = callback
@@ -319,7 +341,7 @@ class MainActivity : Activity() {
                 if(isDestroyed || isFinishing) return@runOnUiThread
                 try {
                     when(data.getString("type")) {
-                        "ready" -> { pageReady = true; injectInsets(); updateNativeNavigation(true); theme(); handleIntent(intent); updatesStatus(); AppUpdates.check(this@MainActivity) { updatesStatus() } }
+                        "ready" -> { pageReady = true; send(JSONObject().put("type","pluginCapability").put("available",pluginSandboxSupported)); injectInsets(); updateNativeNavigation(true); theme(); handleIntent(intent); updatesStatus(); AppUpdates.check(this@MainActivity) { updatesStatus() } }
                         "navigationState" -> navigationState(data)
                         "updateStatus" -> updatesStatus()
                         "checkUpdate" -> { AppUpdates.check(this@MainActivity, true) { updatesStatus() }; updatesStatus() }
@@ -424,7 +446,7 @@ class MainActivity : Activity() {
     private fun handleIntent(intent: Intent) { if(!pageReady) return; intent.getStringExtra("courseId")?.let { send(JSONObject().put("type",if(intent.getBooleanExtra("navigateCourse",false)) "navigateCourse" else "course").put("courseId",it)); intent.removeExtra("courseId"); intent.removeExtra("navigateCourse") }; if(intent.getBooleanExtra("poke",false)) { message("海豚收到啦，今天也一起加油！"); intent.removeExtra("poke") } }
     override fun onResume() { super.onResume(); if(::web.isInitialized) web.onResume(); if(pageReady) { ReminderScheduler.enqueue(this); Notifications.pet(this); AppUpdates.schedule(this); AppUpdates.check(this) { updatesStatus() }; updatesStatus() } }
     override fun onPause() { if(::web.isInitialized) web.onPause(); super.onPause() }
-    override fun onDestroy() { stopObservingUpdates?.invoke(); stopObservingUpdates = null; fileCallback?.onReceiveValue(null); fileCallback = null; captureFile?.delete(); if(::web.isInitialized) { web.removeJavascriptInterface("Dolphin"); web.destroy() }; super.onDestroy() }
+    override fun onDestroy() { bridgeExecutor.shutdownNow(); stopObservingUpdates?.invoke(); stopObservingUpdates = null; fileCallback?.onReceiveValue(null); fileCallback = null; captureFile?.delete(); if(::web.isInitialized) { web.removeJavascriptInterface("Dolphin"); web.destroy() }; super.onDestroy() }
 
     private inner class EdgeWebView : WebView(this@MainActivity) {
         private var tracking = false

@@ -49,7 +49,7 @@ try{
   for(const [name,route] of [['设置','settings'],['搜索','search'],['平铺','grid'],['列表','list']]){await goTab(page,name);assert.equal(await page.locator('.screen.active').getAttribute('data-screen'),route);assert.equal(await page.locator('.primary-navigation [aria-current=page]').innerText(),name);}
  });
  await goTab(page,'设置');
- await check('设置分组与入口顺序',async()=>{assert.deepEqual(await page.locator('.screen.active .setting-entry strong').allTextContents(),['主页显示','课表管理','外观','实时通知','导航与学校','应用更新','数据与备份','关于']);assert.equal(await page.locator('.screen.active [data-setting=editor]').count(),1);});
+ await check('设置分组与入口顺序',async()=>{assert.deepEqual(await page.locator('.screen.active .setting-entry strong').allTextContents(),['主页显示','课表管理','外观','实时通知','导航与学校','应用更新','数据与备份','插件管理','关于']);assert.equal(await page.locator('.screen.active [data-setting=editor]').count(),1);});
  await check('通知三段流程与导航状态开关持久化',async()=>{
   await page.locator('[data-setting="notifications"]').click();
   assert.deepEqual(await page.locator('.screen.active .subheading').allTextContents(),['课前提醒','导航中的实时状态','通知栏小伙伴']);

@@ -8,11 +8,19 @@
 
 Dolphin Calendar 是面向校园日常的本地课表应用。它用同一套 React 界面提供网页版和 Android 安装版：主页看课程，点击课程看教师、教室和教材，需要时再开启提醒、导航或系统日历。
 
-无需账号，没有自建业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。当前源码版本为 **1.4.11**，正式安装包见 [GitHub Releases](https://github.com/tequed232/Dolphin-Calendar/releases)。各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
+无需账号，没有自建业务服务器，也不自动上传课表、封面或背景。Android 的基础课表界面和资源均随 APK 内置；地图导航使用用户选择的外部地图应用。当前源码版本为 **1.5.1**，正式安装包见 [GitHub Releases](https://github.com/tequed232/Dolphin-Calendar/releases)。各版本的构建与设备验证结果见 [验证与使用说明](docs/STATUS.md)。源码仓库：[tequed232/Dolphin-Calendar](https://github.com/tequed232/Dolphin-Calendar)。
 
 在线使用：[Dolphin Calendar 网页版](https://tequed232.github.io/Dolphin-Calendar/)。网页版发布运行 `npm run build:pages`，入口为 `build/pages/index.html`。该入口内置编译后的界面代码和样式，图片与离线缓存文件随整个目录发布，支持 `/Dolphin-Calendar/` 子路径。不要将开发用的 `web/index.html` 单独上传。发布工作流和 Pages 发布条件见 [发布说明](docs/PUBLISHING.md)。
 
 [功能](#功能概览) · [JSON 格式](#json-课表格式) · [本地开发](#本地开发) · [架构](#工程架构) · [验证](#验证与测试) · [许可](#许可证与美术资产)
+
+## 1.5.1 插件接口与行程通知精简
+
+新增「设置 → 插件管理」：本地JSON包安装、权限确认、启停、更新、卸载、专属配置和主题管理。插件工具只在管理页由用户主动打开，退出、刷新或返回后不会自动运行；列表、平铺、搜索和原编辑流程保持原界面。开发者可以通过公开接口制作自己的课表、统计和导入转换工具，不需要修改APK。
+
+[插件开发与内置接口文档](docs/PLUGINS.md)详细介绍技术栈、包结构、API v1、课表数据、主题颜色、自定义导入、权限、生命周期、配置限额、打包、调试及完整示例。管理页可下载示例JSON；TypeScript接口见 [api.d.ts](web/src/plugins/api.d.ts)，可运行示例源码见 [pluginExample.ts](web/src/lib/pluginExample.ts)。插件转换结果交给原导入流程预览并由用户确认，不能直接改写课表。
+
+行程通知展开时课程名独立显示，完整地址只保留在下方地图按钮，移除计时、数字阶段和重复地址；收起的短楼栋标签、图标及“我到了”操作保留。验证范围见 [1.5.1记录](docs/REVIEW_1.5.1.md)。
 
 ## 1.4.11 平铺滚动日期修复
 
@@ -282,6 +290,20 @@ pwsh -File scripts/check-release.ps1 -PreviousApk "旧版正式 APK 的路径"
 界面使用 **React 19 + TypeScript + Vite 7**，Material Symbols 为本地 SVG 子集。`md-card` 和 `md-dialog` 是项目自己的 Web 自定义元素，不是原生 Compose 组件。
 
 Android 宿主使用 **Kotlin + WebViewAssetLoader + AndroidX Core / WebKit**。网页由安全的本地 HTTPS 资源域加载，通过 `window.Dolphin.postMessage()` 请求原生能力，再由 `window.dolphinNative` 接收结果。
+
+### 插件开发者的技术入口
+
+| 层次 | 当前技术与源码入口 | 插件接入方式 |
+| --- | --- | --- |
+| 前端 | React 19.1.1、TypeScript 5.9.2、Vite 7.3.6；`web/src/screens`、`components` | 可使用HTML／CSS／JS或自行打包框架，工具在管理页的独立iframe运行 |
+| 课表模型 | [`model.ts`](web/src/lib/model.ts)、[`scheduleTime.ts`](web/src/lib/scheduleTime.ts) | `getSchedule`读取快照、`getCourses`复用日期和周次规则 |
+| 状态与存储 | [`AppState.tsx`](web/src/state/AppState.tsx)、IndexedDB；成功事务后统一提交 | 插件配置用独立数据库，不给原课表结构增加插件字段 |
+| 导入 | [`Import.tsx`](web/src/screens/Import.tsx)、JSON／CSV／Excel解析器 | `requestImport`只打开原预览与确认流程 |
+| 主题 | [`tokens.css`](web/src/theme/tokens.css)、明暗模式与动态取色 | SDK提供颜色上下文；用户主动选择的主题声明只覆盖白名单颜色 |
+| Android | Kotlin、AndroidX WebKit 1.12.1／Core 1.15.0；min SDK 26、target 36 | 同一Web构建；原生桥限定本地HTTPS来源与主frame，插件没有原生调用权 |
+| 插件宿主 | [`PluginFrame.tsx`](web/src/components/PluginFrame.tsx)、[`plugins.ts`](web/src/lib/plugins.ts) | `window.DolphinPlugin`异步SDK，API v1、manifest权限、版本与参数校验 |
+
+完整约定、开发目录与打包示例以 [插件文档](docs/PLUGINS.md)为准。本版提供插件管理与受控接口，不在课表页添加插件入口，不设置自动下载的插件仓库，也不兼容其他应用的插件包。
 
 ```mermaid
 flowchart TD

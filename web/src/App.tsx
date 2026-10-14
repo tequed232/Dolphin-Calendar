@@ -6,6 +6,7 @@ import {Home} from './screens/Home';
 import {Search} from './screens/Search';
 import {SettingsHome,SettingsPage,ROUTE_TITLES} from './screens/Settings';
 import {Import} from './screens/Import';
+import {Plugins} from './screens/Plugins';
 import {ScheduleManagement} from './screens/ScheduleManagement';
 import {Icon} from './components/Icon';
 import {PrimaryNavigation} from './components/PrimaryNavigation';
@@ -20,7 +21,7 @@ import {useWindowInsets} from './theme/useWindowInsets';
 import {AppBackground} from './components/AppBackground';
 import {Onboarding} from './components/Onboarding';
 export function App(){
-  const {data,ready,error,update,toast}=useApp(),[detail,setDetail]=useState<{course:Course;origin?:DOMRect}|null>(null),[editing,setEditing]=useState<{course:Course|null;seed?:Partial<Course>}|null>(null),[intro,setIntro]=useState(false),[dialogOpen,setDialogOpen]=useState(false);
+  const {data,ready,error,update,toast}=useApp(),[detail,setDetail]=useState<{course:Course;origin?:DOMRect}|null>(null),[editing,setEditing]=useState<{course:Course|null;seed?:Partial<Course>}|null>(null),[intro,setIntro]=useState(false),[dialogOpen,setDialogOpen]=useState(false),[pluginDraft,setPluginDraft]=useState<string|null>(null);
   const introSaving=useRef(false);
   const bridgeContext=useRef({data,navigate,toast,selectTab});bridgeContext.current={data,navigate,toast,selectTab};
   const [layoutEditing,setLayoutEditing]=useState(false);
@@ -37,6 +38,7 @@ export function App(){
   useEffect(()=>{
     window.dolphinNative=(event)=>{
       if(event.type==='updateStatus'&&event.update)window.dispatchEvent(new CustomEvent('dolphin-update',{detail:event.update}));
+      if(event.type==='pluginCapability'){window.dolphinPluginSandboxSupported=!!event.available;window.dispatchEvent(new Event('dolphin-plugin-capability'));}
       if(event.type==='message')bridgeContext.current.toast(event.message??'');
       if(event.type==='nativeNavigation')window.dispatchEvent(new CustomEvent('dolphin-native-navigation',{detail:event}));
       if(event.type==='selectTab'&&TABS.includes(event.value as Tab))bridgeContext.current.selectTab(event.value as Tab);
@@ -72,7 +74,7 @@ export function App(){
   return <><main className="app-shell" data-navigation-visible={navigationVisible} data-navigation-layout={primaryNavigation.layout}><AppBackground image={data.background} enabled={data.settings.backgroundEnabled}/>
   {error?<div className="fatal-error" role="alert"><Icon name="shield"/><h2>本地数据暂时不可用</h2><p>{error}</p><button className="primary" onClick={()=>location.reload()}>重试读取</button></div>:<>
   <div className="screen-host" inert={!ready||!!detail}>{TABS.map(tab=>{const active=tab===nav.tab,preview=active&&nav.stack.length===1;return <section key={tab} className={`screen tab-screen ${active?'selected-tab':''} ${active&&!nav.stack.length?'active':''} ${preview?'previous-screen':''}`} aria-hidden={!active||nav.stack.length>0} inert={!active||nav.stack.length>0} data-screen={tab}>{(tab==='list'||tab==='grid')?<Home mode={tab} view={view} manage={()=>{view.prepareSwitch();nav.push('editor');}} overlayOpen={!!detail||dialogOpen||intro} onLayoutEditingChange={setLayoutEditing} quickAdd={quickAdd} openUpdates={openUpdates} openCourse={openCourse} openImport={openImport} addCourse={addCourse} navigate={navigate} visible={active&&!nav.stack.length}/>:tab==='search'?<Search openCourse={openCourse} openImport={openImport} addCourse={addCourse}/>:<SettingsHome push={nav.push}/>}</section>;})}
-  {nav.stack.map((route,i)=><section key={`${i}-${route}`} className={`screen sub-screen ${i===top?'active':''} ${i===top-1?'previous-screen':''} ${i===top&&nav.returning?'returning':''}`} aria-hidden={i!==top} inert={i!==top} data-screen={route}><div className="page-inner"><header className="sub-header"><button className="icon-button" aria-label="返回上一页" onClick={nav.back}><Icon name="back"/></button><h1>{ROUTE_TITLES[route]}</h1><span/></header>{route==='import'?<Import done={nav.finish}/>:route==='editor'?<ScheduleManagement push={nav.push} editCourse={c=>setEditing({course:c})}/>:<SettingsPage route={route} push={nav.push} editCourse={c=>setEditing({course:c})} openCourse={openCourse} showIntro={()=>setIntro(true)}/>}</div></section>)}
+  {nav.stack.map((route,i)=><section key={`${i}-${route}`} className={`screen sub-screen ${i===top?'active':''} ${i===top-1?'previous-screen':''} ${i===top&&nav.returning?'returning':''}`} aria-hidden={i!==top} inert={i!==top} data-screen={route}><div className="page-inner"><header className="sub-header"><button className="icon-button" aria-label="返回上一页" onClick={nav.back}><Icon name="back"/></button><h1>{ROUTE_TITLES[route]}</h1><span/></header>{route==='import'?<Import done={nav.finish} initialText={pluginDraft??undefined} onInitialTextConsumed={()=>setPluginDraft(null)}/>:route==='plugins'?<Plugins active={i===top&&!detail&&!dialogOpen&&!intro} date={view.focus.date} onSelectDate={view.selectDate} onOpenCourse={id=>{const course=data.schedule.courses.find(c=>c.id===id);if(course)openCourse(course);}} onImport={json=>{setPluginDraft(json);nav.push('import');}}/>:route==='editor'?<ScheduleManagement push={nav.push} editCourse={c=>setEditing({course:c})}/>:<SettingsPage route={route} push={nav.push} editCourse={c=>setEditing({course:c})} openCourse={openCourse} showIntro={()=>setIntro(true)}/>}</div></section>)}
   </div><div id="home-actions-portal"/>{navigationVisible&&!primaryNavigation.nativeAvailable&&<PrimaryNavigation active={nav.tab} onSelect={selectTab}/>}</>}
   {!ready&&!error&&<div className="startup-state load-note" role="status"><Icon name="dolphin" size={48}/><strong>正在读取本地课表…</strong></div>}
   {detail&&<CourseSheet key={detail.course.id} course={data.schedule.courses.find(c=>c.id===detail.course.id)??detail.course} origin={detail.origin} onClose={()=>setDetail(null)} navigate={navigate} editCourse={c=>{setDetail(null);setEditing({course:c});}}/>}
