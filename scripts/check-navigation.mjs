@@ -8,4 +8,4 @@ export async function goTab(page,name){
  }
  await page.locator('.primary-navigation').getByRole('button',{name,exact:true}).click();await page.waitForTimeout(80);return true;
 }
-export async function pasteJSON(page){if(await page.locator('.screen.active .import-paste-option').count())await page.locator('.screen.active .import-paste-option').evaluate(el=>el.open=true);}
+export async function pasteJSON(page){const option=page.locator('.screen.active .import-paste-option');await option.waitFor();await option.evaluate(el=>el.open=true);}

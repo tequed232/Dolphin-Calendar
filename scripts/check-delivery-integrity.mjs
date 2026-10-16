@@ -132,6 +132,8 @@ const expected={
 };
 // Scope allowance, not a new hash baseline. Unlisted business files remain frozen.
 // Mixed UI/bridge files require review plus behavior checks.
+// 2026-10-16 supplementary review: docs/BUSINESS_UX_AUDIT.md. The original
+// parser hashes and mutations below remain unchanged; new logic has focused tests.
 const reviewedChanges={
  "web/src/nav/useNavigation.ts":"1.5.1 add plugins secondary route type only; existing navigation implementation unchanged",
  "app/src/main/java/com/dolphin/calendar/Notifications.kt":"1.5.1 remove repeated expanded locations, timers and numeric stages; preserve actions and collapsed building",

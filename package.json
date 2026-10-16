@@ -10,7 +10,7 @@
     "check": "node scripts/verify.mjs",
     "check:source-files": "node scripts/check-source-files.mjs",
     "hooks:install": "git config --local core.hooksPath .githooks",
-    "test": "node --import tsx --test scripts/check-import.test.ts scripts/check-schedule.test.ts scripts/check-unified-import.test.ts scripts/check-data-recovery.test.ts scripts/check-performance.test.ts scripts/check-plugins.test.ts",
+    "test": "node --import tsx --test scripts/check-import.test.ts scripts/check-schedule.test.ts scripts/check-unified-import.test.ts scripts/check-data-recovery.test.ts scripts/check-performance.test.ts scripts/check-plugins.test.ts scripts/check-import-preview.test.ts",
     "check:ui": "node scripts/check-ui.mjs",
     "android": "powershell -ExecutionPolicy Bypass -File scripts/android.ps1",
     "deliver": "pwsh -NoProfile -File scripts/deliver.ps1",
@@ -27,6 +27,7 @@
     "@types/react-dom": "19.1.9",
     "@vitejs/plugin-react": "5.0.3",
     "playwright": "1.55.1",
+    "rollup": "4.63.5",
     "tsx": "4.20.5",
     "typescript": "5.9.2",
     "vite": "7.3.6"

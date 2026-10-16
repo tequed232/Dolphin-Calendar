@@ -8,6 +8,8 @@ import {Updates} from './Updates';
 import {Toggle,Select,LinkRow} from '../components/SettingsControls';
 import {exportText} from '../lib/export';
 import {ScheduleSettings} from '../components/ScheduleSettings';
+import {TextSaveStatus} from '../components/TextSaveStatus';
+import {useAutosavedText} from '../state/useAutosavedText';
 import {APP_VERSION,GITHUB_PROFILE_URL} from '../meta';
 import {isNative,native} from '../lib/native';
 import type {Course,Settings as Preferences} from '../lib/model';
@@ -44,8 +46,11 @@ export function SettingsHome({push}:{push:(r:Route)=>void}){
 
 export function SettingsPage({route,push,editCourse,openCourse,showIntro}:{route:Route;push:(r:Route)=>void;editCourse:(c:Course|null)=>void;openCourse:(c:Course)=>void;showIntro:()=>void}){
   const {data,update,toast}=useApp(),s=data.settings;
-  const [lyricsExpanded,setLyricsExpanded]=useState(false),[draftLines,setDraftLines]=useState(()=>s.lines.split('\n'));
-  function saveLines(lines:string[]){setDraftLines(lines);set('lines',lines.join('\n'));}
+  const [lyricsExpanded,setLyricsExpanded]=useState(false);
+  const schoolEditor=useAutosavedText(s.school,value=>update(d=>({...d,settings:{...d.settings,school:value}})));
+  const linesEditor=useAutosavedText(s.lines,value=>update(d=>({...d,settings:{...d.settings,lines:value}})));
+  const draftLines=linesEditor.value.split('\n');
+  function saveLines(lines:string[]){linesEditor.change(lines.join('\n'));}
   function set<K extends keyof Preferences>(key:K,value:Preferences[K]){void update(d=>({...d,settings:{...d.settings,[key]:value}})).catch(()=>{});}
   function device(action:string){if(isNative())native(action);else toast('请在 Android 安装版中使用系统通知与日程功能');}
   if(route==='schedule-settings')return <ScheduleSettings openTimes={()=>push('times')}/>;
@@ -86,13 +91,14 @@ export function SettingsPage({route,push,editCourse,openCourse,showIntro}:{route
       <Toggle id="pet" label="通知栏桌宠" description="没有上课行程时，用一句话陪着你" value={s.pet} onChange={v=>{set('pet',v);if(v&&s.notificationsEnabled)device('notificationPermission');}}/>
       <Toggle id="poke" label="显示“戳一下”按钮" value={s.poke} onChange={v=>set('poke',v)}/>
       <button className="lyrics-disclosure" aria-expanded={lyricsExpanded} onClick={()=>setLyricsExpanded(v=>!v)}><span><strong>台词管理</strong><small>{draftLines.filter(line=>line.trim()).length} 句台词 · 点击{lyricsExpanded?'收起':'展开'}</small></span><Icon name="chevron" size={20}/></button>
-      {lyricsExpanded&&<div className="lyrics-list">{draftLines.map((line,i)=><div className="lyric-row" key={i}><input aria-label={`第 ${i+1} 句台词`} value={line} onChange={e=>saveLines(draftLines.map((old,j)=>i===j?e.target.value:old))}/><button className="secondary" aria-label={`删除第 ${i+1} 句台词`} onClick={()=>saveLines(draftLines.filter((_,j)=>j!==i))}>删除</button></div>)}<button className="secondary full" onClick={()=>saveLines([...draftLines,''])}>添加一句台词</button></div>}
+      {lyricsExpanded&&<div className="lyrics-list">{draftLines.map((line,i)=><div className="lyric-row" key={i}><input aria-label={`第 ${i+1} 句台词`} value={line} onChange={e=>saveLines(draftLines.map((old,j)=>i===j?e.target.value:old))} onBlur={()=>void linesEditor.flush()} onCompositionStart={linesEditor.compositionStart} onCompositionEnd={e=>linesEditor.compositionEnd(draftLines.map((old,j)=>i===j?e.currentTarget.value:old).join('\n'))}/><button className="secondary" aria-label={`删除第 ${i+1} 句台词`} onClick={()=>saveLines(draftLines.filter((_,j)=>j!==i))}>删除</button></div>)}<button className="secondary full" onClick={()=>saveLines([...draftLines,''])}>添加一句台词</button></div>}
+      <TextSaveStatus editor={linesEditor}/>
       <p className="hint">一行一句；通知会随机挑选一句。编辑后保存在本机。</p>
       <LinkRow title="打开系统通知设置" onClick={()=>device('notificationSettings')}/>
     </md-card>
   </>;
   if(route==='safe-area')return <><md-card className="form-card"><Toggle id="top-auto" label="上端自动留白" description="读取状态栏与屏幕切口" value={s.topAuto} onChange={v=>set('topAuto',v)}/>{!s.topAuto&&<label className="field">上端留白 {s.topInset} dp<input type="range" min={0} max={100} value={s.topInset} onChange={e=>set('topInset',Number(e.target.value))}/></label>}<Toggle id="bottom-auto" label="下端自动留白" description="底栏与浮动按钮一起避开手势区" value={s.bottomAuto} onChange={v=>set('bottomAuto',v)}/>{!s.bottomAuto&&<label className="field">下端留白 {s.bottomInset} dp<input type="range" min={0} max={100} value={s.bottomInset} onChange={e=>set('bottomInset',Number(e.target.value))}/></label>}</md-card><div className="safe-preview"><div>上端留白</div><Icon name="dolphin" size={52}/><div>底栏 + 手势区</div></div><p className="hint">网页与安装版共用同一套安全区逻辑。窄屏内容过大时可在“外观”调小界面缩放。</p></>;
-  if(route==='navigation')return <md-card className="form-card"><label className="field">学校名称<input placeholder="例如：浙江大学紫金港校区" value={s.school} onChange={e=>set('school',e.target.value)}/></label><Select label="导航地图" value={s.map} onChange={v=>set('map',v as Preferences['map'])}><option value="amap">高德地图</option><option value="baidu">百度地图</option></Select><p className="muted">地图只搜索学校名与楼栋，完整教室号继续留在课程和通知里供你查看。仅点击导航时才会离开本地应用。</p><p className="hint">校内建筑定位依赖导航软件收录情况，找不到时请核对学校和楼名。</p></md-card>;
+  if(route==='navigation')return <md-card className="form-card"><label className="field">学校名称<input placeholder="例如：浙江大学紫金港校区" value={schoolEditor.value} onChange={e=>schoolEditor.change(e.target.value)} onBlur={()=>void schoolEditor.flush()} onCompositionStart={schoolEditor.compositionStart} onCompositionEnd={e=>schoolEditor.compositionEnd(e.currentTarget.value)}/></label><TextSaveStatus editor={schoolEditor}/><Select label="导航地图" value={s.map} onChange={v=>set('map',v as Preferences['map'])}><option value="amap">高德地图</option><option value="baidu">百度地图</option></Select><p className="muted">地图只搜索学校名与楼栋，完整教室号继续留在课程和通知里供你查看。仅点击导航时才会离开本地应用。</p><p className="hint">校内建筑定位依赖导航软件收录情况，找不到时请核对学校和楼名。</p></md-card>;
   if(route==='calendar')return <SystemCalendar/>;
   if(route==='interface')return <><p className="page-purpose">截图和教务页面需要先转换为 JSON，再导入课表。</p><md-card className="form-card"><h3>已有 JSON？直接导入</h3><p className="muted">粘贴内容或选择 .json 文件，检查课程预览和开学日期后确认。</p><h3>只有截图或网页？先转换</h3><p className="muted">在导入页复制转换提示词，交给你选择的工具整理。确认结果包含课程名、星期、节次和周次，再回到这里导入。</p><button className="secondary full" onClick={()=>push('import')}>查看转换提示词与导入教程</button><p className="hint">导入解析在本机完成。使用外部工具转换时，请自行确认分享的内容。</p></md-card></>;
   if(route==='updates')return <Updates/>;

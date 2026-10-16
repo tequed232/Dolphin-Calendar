@@ -1,5 +1,6 @@
 import {readFile,writeFile,readdir} from 'node:fs/promises';
 import path from 'node:path';
+import {rollup} from 'rollup';
 const root='web/dist';
 const files=await readdir(path.join(root,'assets'));
 const assets=files.map(f=>'./assets/'+f);
@@ -33,6 +34,18 @@ self.addEventListener('fetch',event=>{
 `);
 // 双击版与 APK 使用同一份编译后的 JS/CSS；只在交付时内联资源以支持 file://。
 let html=await readFile(path.join(root,'index.html'),'utf8');
-for(const file of files){if(file.endsWith('.js')){const code=await readFile(path.join(root,'assets',file),'utf8');const moduleUrl=`new URL(${JSON.stringify('./assets/'+file)},location.href).href`;const inline=code.replaceAll('import.meta.url',moduleUrl);html=html.replace(/<script type="module"[^>]*src="[^\"]+"[^>]*><\/script>/,()=>`<script type="module">${inline.replace(/<\/script/gi,'<\\/script')}</script>`);}if(file.endsWith('.css')){const css=await readFile(path.join(root,'assets',file),'utf8');html=html.replace(/<link rel="stylesheet"[^>]*>/,()=>`<style>${css}</style>`);}}
+const entry=html.match(/<script type="module"[^>]*src="([^"]+)"[^>]*><\/script>/);
+if(!entry)throw new Error('构建缺少主入口，无法生成离线页面');
+// Flatten the already compiled chunks for file://; HTTP and APK keep deferred imports.
+const bundle=await rollup({input:path.join(root,entry[1])});
+try{
+ const {output}=await bundle.generate({format:'es',inlineDynamicImports:true});
+ const code=output.find(item=>item.type==='chunk'&&item.isEntry)?.code;
+ if(!code)throw new Error('离线入口合并失败');
+ const moduleUrl=`new URL(${JSON.stringify(entry[1])},location.href).href`;
+ const inline=code.replaceAll('import.meta.url',moduleUrl);
+ html=html.replace(entry[0],()=>`<script type="module">${inline.replace(/<\/script/gi,'<\\/script')}</script>`);
+}finally{await bundle.close();}
+for(const file of files)if(file.endsWith('.css')){const css=await readFile(path.join(root,'assets',file),'utf8');html=html.replace(/<link rel="stylesheet"[^>]*>/,()=>`<style>${css}</style>`);}
 await writeFile(path.join(root,'Dolphin-Calendar-offline.html'),html);
 console.log('同一份构建已生成 APK 资源、离线缓存与可双击打开的 HTML。');
