@@ -42,6 +42,12 @@ object CalendarSync {
         val ids = undo.getJSONArray("previousIds")
         return (0 until ids.length()).map { ids.getLong(it) }
     }
+    private fun previousVisibility(undo: JSONObject): Map<Long, Boolean> {
+        val ids = previousIds(undo)
+        val values = undo.optJSONObject("previousVisibility")
+        val recorded = values?.let { ids.filter { values.has(it.toString()) }.associateWith { values.getBoolean(it.toString()) } }
+        return CalendarHistory.restoreVisibility(ids, recorded)
+    }
     private fun undo(context: Context): JSONObject? = ReminderScheduler.preferences(context)
         .getString(UNDO, null)?.let { runCatching { JSONObject(it) }.getOrNull() }
 
@@ -69,8 +75,8 @@ object CalendarSync {
     @Synchronized fun restore(context: Context): String {
         val saved = undo(context) ?: return "没有可复原的导入记录"
         check(canRestore(context)) { "复原副本已被系统日历移除，当前课程未更改" }
-        val previous = previousIds(saved)
-        apply(context, previous.map { visibility(context, it, true) } + delete(context, saved.getLong("createdId")))
+        val previous = previousVisibility(saved)
+        apply(context, previous.map { (id, visible) -> visibility(context, id, visible) } + delete(context, saved.getLong("createdId")))
         ReminderScheduler.preferences(context).edit().remove(UNDO).commit()
         return if (previous.isEmpty()) "已撤销首次导入，移除本次创建的课程日历" else "已复原到上一次导入前的 Dolphin 课程日历"
     }
@@ -82,7 +88,8 @@ object CalendarSync {
         val source = snapshot.getJSONArray("courses")
         val expected = (0 until source.length()).sumOf { source.getJSONObject(it).let { course -> if (course.optString("specificDate").isNotBlank()) 1 else course.getJSONArray("weeks").length() } }
         val all = calendars(context)
-        val previous = all.filterValues { it }.keys.toList()
+        val backups = undo(context)?.let { runCatching { previousIds(it) }.getOrDefault(emptyList()) } ?: emptyList()
+        val previous = CalendarHistory.previous(all, backups)
         val prefs = ReminderScheduler.preferences(context)
         val oldUndo = prefs.getString(UNDO, null)
         val timezone = TimeZone.getDefault().id
@@ -122,9 +129,10 @@ object CalendarSync {
             } }
             val count = events.chunked(200).sumOf { context.contentResolver.bulkInsert(CalendarContract.Events.CONTENT_URI, it.toTypedArray()) }
             check(count == events.size) { "日程写入不完整，已保留原有课程日历" }
-            val saved = JSONObject().put("createdId", id).put("previousIds", JSONArray(previous))
+            val saved = JSONObject().put("createdId", id).put("previousIds", JSONArray(previous.keys.toList()))
+                .put("previousVisibility", JSONObject(previous.mapKeys { it.key.toString() }))
             check(prefs.edit().putString(UNDO, saved.toString()).commit()) { "无法保存复原记录，原有日历未更改" }
-            apply(context, previous.map { visibility(context, it, false) } + visibility(context, id, true))
+            apply(context, previous.keys.map { visibility(context, it, false) } + visibility(context, id, true))
             // 只保留最近一次导入的复原副本，避免多次导入无限积累隐藏日程。
             all.keys.filter { it !in previous }.forEach { oldId -> runCatching { apply(context, listOf(delete(context, oldId))) } }
             val skipped = expected - count

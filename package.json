@@ -10,7 +10,7 @@
     "check": "node scripts/verify.mjs",
     "check:source-files": "node scripts/check-source-files.mjs",
     "hooks:install": "git config --local core.hooksPath .githooks",
-    "test": "node --import tsx --test scripts/check-import.test.ts scripts/check-schedule.test.ts scripts/check-unified-import.test.ts scripts/check-data-recovery.test.ts scripts/check-performance.test.ts scripts/check-plugins.test.ts scripts/check-import-preview.test.ts",
+    "test": "node --import tsx --test scripts/check-import.test.ts scripts/check-schedule.test.ts scripts/check-unified-import.test.ts scripts/check-data-recovery.test.ts scripts/check-performance.test.ts scripts/check-plugins.test.ts scripts/check-import-preview.test.ts scripts/check-plugin-storage.test.ts scripts/check-calendar-count.test.ts",
     "check:ui": "node scripts/check-ui.mjs",
     "android": "powershell -ExecutionPolicy Bypass -File scripts/android.ps1",
     "deliver": "pwsh -NoProfile -File scripts/deliver.ps1",

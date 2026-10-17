@@ -1,6 +1,7 @@
 import { initialData, type AppData, type Settings } from './model';
 import {migrateSchedule,migrateDisplay} from './migration';
 import {normalizeHolidayDays,normalizeHolidayRanges} from './holidays';
+import {readState,commitState,replaceState,onStateChange} from './stateTransactions';
 const DATABASE = 'dolphin-calendar';
 let connection: Promise<IDBDatabase> | undefined;
 function open() {
@@ -22,14 +23,10 @@ function open() {
   void opening.catch(()=>{if(connection===opening)connection=undefined;});
   return opening;
 }
-export async function loadData():Promise<AppData> {
-  const db=await open(); return new Promise((resolve,reject)=>{
-    const r=db.transaction('state').objectStore('state').get('app');
-    r.onsuccess=()=>{
-      try{
-      const defaults=initialData(),saved=r.result as AppData|undefined;
-      if(saved&&saved.schema!==1) {reject(new Error('此数据来自更新版本，请升级应用后打开'));return;}
-      if(!saved){resolve(defaults);return;}
+function restoreData(raw:unknown):AppData {
+      const defaults=initialData(),saved=raw as AppData|undefined;
+      if(saved&&saved.schema!==1)throw new Error('此数据来自更新版本，请升级应用后打开');
+      if(!saved)return defaults;
       const legacyAppearance=!(saved as Partial<AppData>).appearanceRevision;
       const savedSettings={...saved.settings} as Partial<Settings> & {contour?:number};
       delete savedSettings.contour;
@@ -42,17 +39,14 @@ export async function loadData():Promise<AppData> {
       const background=saved.background?.url?.match(/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/)&&saved.background.url.length<=3_000_000?saved.background:undefined;
       const holidayCalendarIds=Array.isArray(saved.holidayCalendarIds)?[...new Set(saved.holidayCalendarIds.filter(id=>typeof id==='string'&&id.length>0))].sort():[];
       const holidaySourceNames=Array.isArray(saved.holidaySourceNames)?saved.holidaySourceNames.filter(name=>typeof name==='string'):[];
-      resolve({...defaults,...saved,schedule:migrateSchedule(saved.schedule),background,appearanceRevision:2,holidays:normalizeHolidayDays(saved.holidays).slice(-12000),holidayRanges:normalizeHolidayRanges(saved.holidayRanges).slice(-6),holidayCalendarIds,holidaySourceNames,settings:{...migrateDisplay(settings),holidayMarkers:!!settings.holidayMarkers,backgroundEnabled:!!background&&!!settings.backgroundEnabled}});
-      }catch(error){reject(error);}
-    };r.onerror=()=>reject(r.error);
-  });
+      return {...defaults,...saved,schedule:migrateSchedule(saved.schedule),background,appearanceRevision:2,holidays:normalizeHolidayDays(saved.holidays).slice(-12000),holidayRanges:normalizeHolidayRanges(saved.holidayRanges).slice(-6),holidayCalendarIds,holidaySourceNames,settings:{...migrateDisplay(settings),holidayMarkers:!!settings.holidayMarkers,backgroundEnabled:!!background&&!!settings.backgroundEnabled}};
 }
+export async function loadData(current?:AppData):Promise<AppData>{return readState(await open(),restoreData,current);}
 export async function saveData(data: AppData) {
-  const db=await open(); return new Promise<void>((resolve,reject)=>{
-    const tx=db.transaction('state','readwrite');tx.objectStore('state').put(data,'app');
-    tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error??new Error('保存被中断'));
-  });
+  await replaceState(await open(),data);
 }
+export async function commitData(change:(previous:AppData)=>AppData,current?:AppData){return commitState(await open(),current,change,restoreData);}
+export const onDataChange=(changed:()=>void)=>onStateChange(DATABASE,changed);
 
 // Release metadata is separate from the user's schedule; failed update checks never write app data.
 export async function loadReleaseCache():Promise<unknown>{const db=await open();return new Promise((resolve,reject)=>{const request=db.transaction('state').objectStore('state').get('release');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}

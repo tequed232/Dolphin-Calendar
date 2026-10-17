@@ -135,6 +135,8 @@ const expected={
 // 2026-10-16 supplementary review: docs/BUSINESS_UX_AUDIT.md. The original
 // parser hashes and mutations below remain unchanged; new logic has focused tests.
 const reviewedChanges={
+ "app/src/main/java/com/dolphin/calendar/CalendarSync.kt":"2026-10-17 preserve hidden active course calendars and original visibility; retire only known undo copies, retain legacy undo compatibility",
+ "web/src/screens/SystemCalendar.tsx":"2026-10-17 count a specific-date course once even when its repeating weeks are empty; leave course data unchanged",
  "web/src/nav/useNavigation.ts":"1.5.1 add plugins secondary route type only; existing navigation implementation unchanged",
  "app/src/main/java/com/dolphin/calendar/Notifications.kt":"1.5.1 remove repeated expanded locations, timers and numeric stages; preserve actions and collapsed building",
  "web/src/components/CourseEditor.tsx":"1.4.10 synchronize the temporary date and displayed weekday while editing",

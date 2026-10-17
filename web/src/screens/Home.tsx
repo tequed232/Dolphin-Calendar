@@ -43,7 +43,7 @@ export function Home({openCourse,openImport,addCourse,navigate,visible,openUpdat
   const suggestedLabel=suggestions.next?`查看 ${parseDate(suggestions.next).getFullYear()!==date.getFullYear()?parseDate(suggestions.next).getFullYear()+' 年 ':''}${parseDate(suggestions.next).getMonth()+1} 月 ${parseDate(suggestions.next).getDate()} 日课程`:'查看本学期有课日期';
   useEffect(()=>{if(!visible)return;const refresh=()=>{if(!document.hidden)setNow(Date.now());};refresh();const id=setInterval(refresh,30000);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);return()=>{clearInterval(id);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};},[visible]);
   useEffect(()=>{setActionsHost(document.getElementById('home-actions-portal'));},[]);
-  useEffect(()=>{const query=matchMedia('(orientation:landscape) and (min-width:480px)'),refresh=()=>setVerticalDates(query.matches);query.addEventListener('change',refresh);return()=>query.removeEventListener('change',refresh);},[]);
+  useEffect(()=>{const query=matchMedia('(orientation:landscape) and (min-width:480px)'),refresh=()=>setVerticalDates(query.matches);query.addEventListener('change',refresh);refresh();return()=>query.removeEventListener('change',refresh);},[]);
 
   function move(amount:number){setSelected(dateKey(addDays(date,amount)));haptic();}
   function selectDate(value:string){setSelected(value);setCalendarOpen(false);haptic();}

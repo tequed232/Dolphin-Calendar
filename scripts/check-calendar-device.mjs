@@ -71,6 +71,17 @@ try {
  await restore();assert.equal(count(),4);assert.doesNotMatch(events(),/日历验证数学更新/);pass('更新课表后复原恢复旧课程、原教师地点及跨学年日期');
  await state(fixture);await page.reload();await open();await importCourse();await result('已导入 4 次');await importCourse();await result('已导入 4 次');assert.equal(count(),4);assert.equal(owned().length,2);assert.equal(owned().filter(calendar=>calendar.visible).length,1);pass('重复导入不重复显示课程，只保留一份隐藏复原副本');
  await page.reload();await open();await page.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(button=>button.textContent==='复原到导入前')?.disabled);await restore();assert.equal(count(),4);pass('重开页面后仍可复原最近一次导入');
+ const hidden=owned().find(calendar=>calendar.visible);assert.ok(hidden);
+ adb('shell','content','update','--uri',`${authority}/calendars`,'--bind','visible:i:0','--where',quote(`_id=${hidden.id}`));assert.equal(count(),0);
+ await importCourse();await result('已导入 4 次');await restore();
+ const restoredHidden=owned().find(calendar=>calendar.id===hidden.id);assert.ok(restoredHidden,'隐藏的原课程日历在复原后必须存在');assert.equal(restoredHidden.visible,false);
+ assert.equal((query('events','_id:title',`calendar_id=${hidden.id} AND deleted=0`).match(/^Row: /gm)??[]).length,4);
+ adb('shell','content','update','--uri',`${authority}/calendars`,'--bind','visible:i:1','--where',quote(`_id=${hidden.id}`));assert.equal(count(),4);
+ pass('用户隐藏课程日历后再次导入，复原保留原日程和原隐藏状态');
+ const dated=structuredClone(fixture);dated.schedule.courses=[{...fixture.schedule.courses[0],id:'calendar-specific-empty',day:5,weeks:[],specificDate:'2026-10-16'}];
+ await state(dated);await page.reload();await open();assert.match(await page.locator('.calendar-count').innerText(),/1 次上课/);
+ await importCourse();await result('已导入 1 次');assert.equal(count(),1);assert.match(events(),new RegExp(`dtstart=${await page.evaluate(()=>new Date(2026,9,16,8,0).getTime())}`));
+ await restore();assert.equal(count(),4);pass('仅指定日期且重复周次为空的课程可导入一次，原课程日历仍可复原');
  const invalid=structuredClone(fixture);invalid.schedule.periods=invalid.schedule.periods.map(()=>({start:'',end:''}));await state(invalid);await page.reload();await open();await importCourse();await result('没有可写入的课程');assert.equal(count(),4);pass('没有有效上课时间时保留已有系统课程并显示错误');
  await page.getByRole('button',{name:'清除已导入的课程',exact:true}).click();await page.getByRole('button',{name:'确认清除',exact:true}).click();await result('已清除');assert.equal(owned().length,0);assert.equal(await page.getByRole('button',{name:'复原到导入前',exact:true}).isDisabled(),true);
  assert.match(query('events','_id:title',`calendar_id=${externalId}`),/UnrelatedEvent/);pass('导入、复原和清除均保留其他日历的日程');
@@ -97,6 +108,6 @@ try {
  }
  if(externalId)adb('shell','content','delete','--uri',quote(`${authority}/calendars/${externalId}?caller_is_syncadapter=true&account_name=dolphin-calendar-test&account_type=LOCAL`));
  if(original!==undefined){await state(original);await page.reload();}
- await writeFile(`build/evidence/${version}-android-calendar.json`,JSON.stringify({device:adb('shell','getprop','ro.product.model').trim(),checks,completed:checks.length===10,originalDataRestored:original!==undefined},null,2));
+ await writeFile(`build/evidence/${version}-android-calendar.json`,JSON.stringify({device:adb('shell','getprop','ro.product.model').trim(),checks,completed:checks.length===12,originalDataRestored:original!==undefined},null,2));
  await device.close();adb('shell','am','force-stop','com.microsoft.playwright.androiddriver');
 }

@@ -1,5 +1,6 @@
 import {APP_VERSION} from '../meta';
 import type {Schedule} from './model';
+import {readState,commitState,replaceState,onStateChange} from './stateTransactions';
 
 export const PLUGIN_PERMISSIONS=['schedule:read','navigation:date','course:open','storage:local','schedule:import','theme:app'] as const;
 export type PluginPermission=typeof PLUGIN_PERMISSIONS[number];
@@ -44,9 +45,26 @@ function validateState(value:unknown):PluginState{
  return {plugins,viewId:selection('viewId'),themeId:selection('themeId'),storage:JSON.parse(JSON.stringify(value.storage))};
 }
 let opening:Promise<IDBDatabase>|undefined;
-function database(){if(!opening)opening=new Promise<IDBDatabase>((resolve,reject)=>{let settled=false;const request=indexedDB.open('dolphin-calendar-plugins',1);request.onupgradeneeded=()=>request.result.createObjectStore('state');request.onerror=()=>{settled=true;reject(new Error('无法打开插件存储'));};request.onblocked=()=>{settled=true;reject(new Error('插件存储被其他页面占用，请关闭旧页面后重试'));};request.onsuccess=()=>{if(settled){request.result.close();return;}settled=true;request.result.onversionchange=()=>{request.result.close();opening=undefined;};resolve(request.result);};}).catch(error=>{opening=undefined;throw error;});return opening;}
-export async function loadPluginState():Promise<PluginState>{const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction('state','readonly'),request=tx.objectStore('state').get('app');request.onsuccess=()=>{try{resolve(request.result===undefined?emptyPluginState():validateState(request.result));}catch(error){reject(error);}};tx.onabort=tx.onerror=()=>reject(new Error('插件存储读取失败'));});}
-export async function savePluginState(state:PluginState):Promise<void>{const checked=validateState(state),db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction('state','readwrite');tx.objectStore('state').put(checked,'app');tx.oncomplete=()=>resolve();tx.onabort=tx.onerror=()=>reject(new Error('插件配置保存失败，原配置已保留'));});}
+function database(){
+ if(opening)return opening;
+ const attempt=new Promise<IDBDatabase>((resolve,reject)=>{
+  let settled=false;const request=indexedDB.open('dolphin-calendar-plugins',1);
+  request.onupgradeneeded=()=>request.result.createObjectStore('state');
+  request.onerror=()=>{settled=true;reject(new Error('无法打开插件存储'));};
+  request.onblocked=()=>{settled=true;reject(new Error('插件存储被其他页面占用，请关闭旧页面后重试'));};
+  request.onsuccess=()=>{
+   const db=request.result;if(settled){db.close();return;}settled=true;
+   const release=()=>{if(opening===attempt)opening=undefined;};
+   db.onversionchange=()=>{db.close();release();};db.onclose=release;resolve(db);
+  };
+ });
+ opening=attempt;void attempt.catch(()=>{if(opening===attempt)opening=undefined;});return attempt;
+}
+const restorePluginState=(raw:unknown)=>raw===undefined?emptyPluginState():validateState(raw);
+export async function loadPluginState(current?:PluginState):Promise<PluginState>{return readState(await database(),restorePluginState,current);}
+export async function savePluginState(state:PluginState):Promise<void>{await replaceState(await database(),state,validateState);}
+export async function commitPluginState(change:(previous:PluginState)=>PluginState,current?:PluginState){return commitState(await database(),current,change,restorePluginState,validateState);}
+export const onPluginStateChange=(changed:()=>void)=>onStateChange('dolphin-calendar-plugins',changed);
 export const PLUGIN_PROTOCOL='dolphin-plugin-v1';
 export function createPluginSession(){return [...crypto.getRandomValues(new Uint8Array(24))].map(byte=>byte.toString(16).padStart(2,'0')).join('');}
 // All script payloads are JSON strings, so HTML end-tags cannot escape the SDK script.

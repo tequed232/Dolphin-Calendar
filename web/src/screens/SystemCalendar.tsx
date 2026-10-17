@@ -1,9 +1,10 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {Dialog} from '../components/Dialog';
 import {Icon} from '../components/Icon';
 import {isNative,native,type NativeMessage} from '../lib/native';
 import {useApp} from '../state/AppState';
 import {normalizeRoom} from '../lib/import';
+import {countCourseOccurrences} from '../lib/courseOccurrences';
 
 export function SystemCalendar(){
   const {data}=useApp();
@@ -14,7 +15,7 @@ export function SystemCalendar(){
   const [result,setResult]=useState<{message:string;success:boolean}|null>(null);
   const android=isNative();
   const courses=data.schedule.courses;
-  const total=courses.reduce((sum,course)=>sum+course.weeks.length,0);
+  const total=useMemo(()=>countCourseOccurrences(courses),[courses]);
   useEffect(()=>{
     function receive(event:Event){
       const response=(event as CustomEvent<NativeMessage>).detail;
