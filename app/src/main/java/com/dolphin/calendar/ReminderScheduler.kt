@@ -43,26 +43,64 @@ object ReminderScheduler {
         }
         return result.sortedBy { it.start }
     }
-    fun schedule(context: Context) {
+    @Synchronized fun schedule(context: Context) {
         val alarm = context.getSystemService(AlarmManager::class.java)
         val identity = Intent(context, ReminderReceiver::class.java).setAction(ReminderValidation.ACTION)
         val previous = PendingIntent.getBroadcast(context, 100, identity, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
-        previous?.let { alarm.cancel(it); it.cancel() }
+        val prefs = preferences(context)
+        val previousAt = prefs.getLong("nextReminder", 0).takeIf { previous != null && it > 0 }
         val settings = settings(context)
-        preferences(context).edit().remove("nextReminder").apply()
-        if(!settings.optBoolean("notificationsEnabled",true) || !settings.optBoolean("reminders")) return
-        val advance = settings.optInt("advance",10) * 60_000L
         val now = System.currentTimeMillis()
-        // 只排下一批提醒；打开应用、更新时间或每次触发后重排。设备重启后需打开应用恢复。
-        val future = runCatching { occurrences(context).filter { it.start-advance > now+1000 } }.getOrElse { return }
-        val first = future.firstOrNull() ?: return
-        val at = first.start-advance
+        val current = runCatching { occurrences(context) }.getOrDefault(emptyList())
+        val batch = if(settings.optBoolean("notificationsEnabled",true) && settings.optBoolean("reminders"))
+            ReminderPlanning.next(current.map { ReminderKey(it.course.getString("id"),it.start,it.end) }, settings.optInt("advance",10),now,previousAt)
+            else null
+        if(batch == null) {
+            previous?.let { alarm.cancel(it); it.cancel() }
+            prefs.edit().remove("nextReminder").remove("reminderKeys").remove("reminderToken").apply()
+            return
+        }
+        val keys = JSONArray().also { array -> batch.keys.forEach { array.put(JSONArray().put(it.courseId).put(it.start).put(it.end)) } }.toString()
+        // Inexact alarms can already be due. Cancelling/replacing an unchanged one loses that delivery.
+        if(previousAt == batch.at && prefs.getString("reminderKeys", null) == keys && prefs.contains("reminderToken")) return
+        previous?.let { alarm.cancel(it); it.cancel() }
+        val token = java.util.UUID.randomUUID().toString()
         val events = JSONArray()
-        future.filter { it.start-advance == at }.forEach { events.put(JSONObject().put("course", it.course).put("start",it.start).put("end",it.end)) }
-        val pending = PendingIntent.getBroadcast(context,100,identity.putExtra("events",events.toString()),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val selected = batch.keys.toSet()
+        current.filter { ReminderKey(it.course.getString("id"),it.start,it.end) in selected }.forEach { events.put(JSONObject().put("course", it.course).put("start",it.start).put("end",it.end)) }
+        val pending = PendingIntent.getBroadcast(context,100,identity.putExtra("events",events.toString()).putExtra("reminderToken",token),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         // 系统非精确闹钟不申请额外访问权限；省电或休眠时可能延迟。
-        alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
-        preferences(context).edit().putLong("nextReminder",at).apply()
+        alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, batch.at.coerceAtLeast(now+1), pending)
+        prefs.edit().putLong("nextReminder",batch.at).putString("reminderKeys",keys).putString("reminderToken",token).apply()
+    }
+    @Synchronized fun deliver(context: Context, intent: Intent) {
+        val prefs = preferences(context)
+        val token = intent.getStringExtra("reminderToken")
+        if(token != prefs.getString("reminderToken",null)) return
+        // Consumption and replanning share the same lock with foreground refreshes.
+        prefs.edit().remove("nextReminder").remove("reminderKeys").remove("reminderToken").apply()
+        try {
+            deliverCurrent(context,intent)
+        } finally { schedule(context) }
+    }
+    private fun deliverCurrent(app: Context, intent: Intent) {
+        val raw = intent.getStringExtra("events")
+        val settings=runCatching { settings(app) }.getOrNull()
+        if(settings != null && settings.optBoolean("notificationsEnabled",true) && settings.optBoolean("reminders")) {
+            val events=runCatching { JSONArray(raw ?: "[]") }.getOrDefault(JSONArray())
+            val queued=(0 until events.length()).mapNotNull { index -> runCatching {
+                val event=events.getJSONObject(index)
+                val id=event.getJSONObject("course").get("id") as? String ?: return@runCatching null
+                val start=event.get("start") as? Long ?: (event.get("start") as? Int)?.toLong() ?: return@runCatching null
+                val end=event.get("end") as? Long ?: (event.get("end") as? Int)?.toLong() ?: return@runCatching null
+                ReminderKey(id,start,end)
+            }.getOrNull() }
+            val current=runCatching { occurrences(app) }.getOrDefault(emptyList()).map { occurrence ->
+                ReminderCandidate(ReminderKey(occurrence.course.opt("id") as? String ?: "",occurrence.start,occurrence.end),occurrence)
+            }
+            for(event in ReminderValidation.deliveries(intent.action,true,true,settings.optInt("advance",10),System.currentTimeMillis(),queued,current))
+                runCatching { Notifications.course(app,event.course,event.start,event.end) }
+        }
     }
     fun status(context: Context): String {
         val next = preferences(context).getLong("nextReminder",0)
@@ -75,27 +113,9 @@ class ReminderReceiver : BroadcastReceiver() {
         if(intent.action == "com.dolphin.calendar.STOP_JOURNEY" || intent.action == "com.dolphin.calendar.DISMISS_JOURNEY") { Notifications.expireJourney(context,intent.getStringExtra("journeyToken") ?: ""); return }
         if(intent.action == Notifications.journeyTimeoutAction()) { Notifications.expireJourney(context,intent.getStringExtra("journeyToken") ?: ""); return }
         if(intent.action != ReminderValidation.ACTION) return
-        val pending=goAsync();val app=context.applicationContext;val raw=intent.getStringExtra("events")
+        val pending=goAsync();val app=context.applicationContext
         Thread {
-            try {
-                val settings=runCatching { ReminderScheduler.settings(app) }.getOrNull()
-                if(settings != null && settings.optBoolean("notificationsEnabled",true) && settings.optBoolean("reminders")) {
-                    val events=runCatching { JSONArray(raw ?: "[]") }.getOrDefault(JSONArray())
-                    val queued=(0 until events.length()).mapNotNull { index -> runCatching {
-                        val event=events.getJSONObject(index)
-                        val id=event.getJSONObject("course").get("id") as? String ?: return@runCatching null
-                        // Strings, fractions and missing times are not valid scheduled-alarm payloads.
-                        val start=event.get("start") as? Long ?: (event.get("start") as? Int)?.toLong() ?: return@runCatching null
-                        val end=event.get("end") as? Long ?: (event.get("end") as? Int)?.toLong() ?: return@runCatching null
-                        ReminderKey(id,start,end)
-                    }.getOrNull() }
-                    val current=runCatching { ReminderScheduler.occurrences(app) }.getOrDefault(emptyList()).map { occurrence ->
-                        ReminderCandidate(ReminderKey(occurrence.course.opt("id") as? String ?: "",occurrence.start,occurrence.end),occurrence)
-                    }
-                    for(event in ReminderValidation.deliveries(intent.action,true,true,settings.optInt("advance",10),System.currentTimeMillis(),queued,current))
-                        runCatching { Notifications.course(app,event.course,event.start,event.end) }
-                }
-            } finally { try { runCatching { ReminderScheduler.schedule(app) } } finally { pending.finish() } }
+            try { runCatching { ReminderScheduler.deliver(app,intent) } } finally { pending.finish() }
         }.start()
     }
 }

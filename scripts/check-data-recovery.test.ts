@@ -61,10 +61,13 @@ type Scenario={saved?:unknown;failOpen?:boolean;blocked?:boolean};
 async function storageScenario(scenario:Scenario,run:(storage:typeof import('../web/src/lib/storage.ts'),state:{opens:number;closed:number;callbackErrors:unknown[];database:any;requests:any[]})=>Promise<void>){
  const original=Object.getOwnPropertyDescriptor(globalThis,'indexedDB');
  const state={opens:0,closed:0,callbackErrors:[] as unknown[],database:null as any,requests:[] as any[]};
- const database={objectStoreNames:{contains:()=>true},close:()=>{state.closed++;},onversionchange:null as null|(()=>void),onclose:null as null|(()=>void),transaction:()=>({objectStore:()=>({get:()=>{
-  const request:any={result:scenario.saved,error:null};
-  queueMicrotask(()=>{try{request.onsuccess?.();}catch(error){state.callbackErrors.push(error);}});return request;
- }})})};state.database=database;
+ const database={objectStoreNames:{contains:()=>true},close:()=>{state.closed++;},onversionchange:null as null|(()=>void),onclose:null as null|(()=>void),transaction:()=>{
+  let pending=0,aborted=false;
+  const tx:any={abort:()=>{aborted=true;tx.onabort?.();},objectStore:()=>({get:(key:string)=>{
+   pending++;const request:any={result:key==='app'?scenario.saved:0,error:null};
+   queueMicrotask(()=>{try{request.onsuccess?.();}catch(error){state.callbackErrors.push(error);}if(--pending===0&&!aborted)tx.oncomplete?.();});return request;
+  }})};return tx;
+ }};state.database=database;
  Object.defineProperty(globalThis,'indexedDB',{configurable:true,value:{open:()=>{
   state.opens++;const attempt=state.opens,request:any={result:database,error:new Error('暂时不可用')};
   state.requests.push(request);

@@ -1,5 +1,5 @@
 import {createContext,useContext,useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
-import {emptyPluginState,loadPluginState,savePluginState,validatePluginData,PLUGIN_THEME_TOKENS,type PluginPackage,type PluginState} from '../lib/plugins';
+import {emptyPluginState,loadPluginState,commitPluginState,onPluginStateChange,validatePluginData,PLUGIN_THEME_TOKENS,type PluginPackage,type PluginState} from '../lib/plugins';
 
 type Context={state:PluginState;ready:boolean;error:string;retry:()=>Promise<void>;install:(pkg:PluginPackage)=>Promise<void>;setEnabled:(id:string,value:boolean)=>Promise<void>;remove:(id:string)=>Promise<void>;selectTheme:(id:string|null)=>Promise<void>;loadData:(id:string)=>Promise<unknown>;saveData:(id:string,value:unknown)=>Promise<void>};
 const PluginContext=createContext<Context>(null!);
@@ -14,10 +14,20 @@ export function PluginProvider({children}:{children:ReactNode}){
     catch(cause){if(ticket===generation.current)setError(`插件数据无法读取：${message(cause)}。请保留本机数据并重试。`);}
   }
   useEffect(()=>{void retry();return()=>{generation.current++;};},[]);
+  useEffect(()=>{
+    let active=true,refreshing=false,pending=false;
+    const refresh=()=>{
+      if(!loaded.current)return;pending=true;if(refreshing)return;refreshing=true;
+      const task=queue.current.then(async()=>{pending=false;const value=await loadPluginState(latest.current);if(active){latest.current=value;setState(value);}});
+      queue.current=task.catch(()=>{});
+      void task.catch(()=>{if(active)setError('其他窗口的插件数据暂未读取完成，请重新打开页面；原数据已保留。');}).finally(()=>{refreshing=false;if(active&&pending)refresh();});
+    };
+    const stop=onPluginStateChange(refresh);return()=>{active=false;stop();};
+  },[]);
   async function update(change:(previous:PluginState)=>PluginState){
     const task=queue.current.then(async()=>{
       if(!loaded.current)throw new Error('插件数据尚未读取完成');
-      const next=change(latest.current);await savePluginState(next);
+      const next=await commitPluginState(change,latest.current);
       latest.current=next;setState(next);setError('');
     });
     queue.current=task.catch(()=>{});

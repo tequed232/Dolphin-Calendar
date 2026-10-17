@@ -6,6 +6,15 @@ export async function goTab(page,name){
   await page.waitForTimeout(350);
   if(await page.getByRole('dialog',{name:'有尚未保存的内容',exact:true}).count())return false;
  }
- await page.locator('.primary-navigation').getByRole('button',{name,exact:true}).click();await page.waitForTimeout(80);return true;
+ const navigation=page.locator('.primary-navigation');
+ if(await navigation.count())await navigation.getByRole('button',{name,exact:true}).click();
+ else{
+  // APK business tests use the same callback emitted by its native navigation view.
+  // Actual Android button geometry and touch stay covered by check-native-navigation.
+  const tab=({'列表':'list','平铺':'grid','搜索':'search','设置':'settings'})[name];
+  if(!tab||!await page.evaluate(()=>!!window.Dolphin&&!!window.dolphinNative))throw new Error('主导航尚未就绪');
+  await page.evaluate(tab=>window.dolphinNative({type:'selectTab',value:tab}),tab);
+ }
+ await page.waitForTimeout(80);return true;
 }
-export async function pasteJSON(page){if(await page.locator('.screen.active .import-paste-option').count())await page.locator('.screen.active .import-paste-option').evaluate(el=>el.open=true);}
+export async function pasteJSON(page){const option=page.locator('.screen.active .import-paste-option');await option.waitFor();await option.evaluate(el=>el.open=true);}

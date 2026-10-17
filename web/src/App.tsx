@@ -5,7 +5,7 @@ import {useHomeFocus} from './state/useHomeFocus';
 import {Home} from './screens/Home';
 import {Search} from './screens/Search';
 import {SettingsHome,SettingsPage,ROUTE_TITLES} from './screens/Settings';
-import {Import} from './screens/Import';
+import {DeferredImport as Import} from './components/DeferredImport';
 import {Plugins} from './screens/Plugins';
 import {ScheduleManagement} from './screens/ScheduleManagement';
 import {Icon} from './components/Icon';

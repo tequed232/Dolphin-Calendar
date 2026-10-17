@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { initialData, type AppData } from '../lib/model';
-import { loadData, saveData } from '../lib/storage';
+import { loadData, commitData, onDataChange } from '../lib/storage';
 import { isNative,native } from '../lib/native';
 import { notificationCover } from '../lib/notificationCover';
 import {useHolidayReader} from './useHolidayReader';
@@ -12,10 +12,20 @@ export function AppProvider({children}:{children:ReactNode}) {
   const latest=useRef(data),queue=useRef(Promise.resolve()),timer=useRef<ReturnType<typeof setTimeout>>(undefined);
   function toast(value:string){setMessage(value);clearTimeout(timer.current);timer.current=setTimeout(()=>setMessage(''),4500);}
   useEffect(()=>{loadData().then(value=>{latest.current=value;setData(value);setReady(true);}).catch(e=>setError(`本地数据无法读取：${e.message}。请保留应用数据并重新打开。`));return()=>clearTimeout(timer.current);},[]);
+  useEffect(()=>{
+    let active=true,refreshing=false,pending=false;
+    const refresh=()=>{
+      pending=true;if(refreshing)return;refreshing=true;
+      const task=queue.current.then(async()=>{pending=false;const value=await loadData(latest.current);if(active){latest.current=value;setData(value);}});
+      queue.current=task.catch(()=>{});
+      void task.catch(()=>{if(active)toast('其他窗口的数据暂未读取完成，请重新打开页面；本机数据已保留。');}).finally(()=>{refreshing=false;if(active&&pending)refresh();});
+    };
+    const stop=onDataChange(refresh);return()=>{active=false;stop();};
+  },[]);
   async function update(fn:(previous:AppData)=>AppData) {
     const task=queue.current.then(async()=>{
       if(!ready) throw new Error('本地数据尚未就绪');
-      const next=fn(latest.current);await saveData(next);
+      const next=await commitData(fn,latest.current);
       // 成功落库后统一广播，避免导入页与主页持有不同数据。
       latest.current=next;setData(next);
     });
